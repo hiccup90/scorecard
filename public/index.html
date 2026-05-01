@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>积分打卡 - 孩子端</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh; color: #fff;
+    }
+    .container { max-width: 420px; margin: 0 auto; padding: 20px; }
+
+    /* 头部 */
+    .header { text-align: center; padding: 30px 0 20px; }
+    .balance {
+      font-size: 64px; font-weight: 800; letter-spacing: -2px;
+      text-shadow: 0 4px 12px rgba(0,0,0,0.2); line-height: 1;
+    }
+    .balance-label { font-size: 14px; opacity: 0.8; margin-top: 4px; }
+    .today-info {
+      display: flex; justify-content: center; gap: 24px; margin-top: 12px;
+      font-size: 14px; opacity: 0.85;
+    }
+    .today-info span { font-weight: 700; }
+
+    /* 快捷按钮区 */
+    .section-title {
+      font-size: 16px; font-weight: 600; margin: 24px 0 12px;
+      padding-left: 4px; opacity: 0.9;
+    }
+    .btn-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    }
+    .btn-item {
+      background: rgba(255,255,255,0.18); backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 16px; padding: 18px 8px; text-align: center;
+      cursor: pointer; transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .btn-item:active { transform: scale(0.95); background: rgba(255,255,255,0.3); }
+    .btn-item .icon { font-size: 36px; display: block; margin-bottom: 6px; }
+    .btn-item .label { font-size: 14px; font-weight: 600; }
+    .btn-item .points { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+
+    /* 底部导航 */
+    .tabs {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      max-width: 420px; margin: 0 auto;
+      background: rgba(255,255,255,0.15); backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(255,255,255,0.2);
+      display: flex; padding: 8px 0 env(safe-area-inset-bottom, 8px);
+    }
+    .tab {
+      flex: 1; text-align: center; padding: 8px; cursor: pointer;
+      font-size: 13px; opacity: 0.7; transition: opacity 0.2s;
+    }
+    .tab.active { opacity: 1; font-weight: 700; }
+    .tab .tab-icon { font-size: 22px; display: block; margin-bottom: 2px; }
+
+    /* 页面容器 */
+    .page { display: none; padding-bottom: 100px; }
+    .page.active { display: block; }
+
+    /* 流水列表 */
+    .log-list { list-style: none; }
+    .log-item {
+      display: flex; align-items: center; padding: 12px 16px;
+      background: rgba(255,255,255,0.1); border-radius: 12px;
+      margin-bottom: 8px; gap: 12px;
+    }
+    .log-icon { font-size: 28px; flex-shrink: 0; }
+    .log-info { flex: 1; }
+    .log-reason { font-size: 15px; font-weight: 600; }
+    .log-time { font-size: 12px; opacity: 0.7; }
+    .log-change { font-size: 18px; font-weight: 800; }
+    .log-change.positive { color: #4CAF50; }
+    .log-change.negative { color: #FF5252; }
+
+    /* 奖励卡片 */
+    .reward-card {
+      background: rgba(255,255,255,0.15); backdrop-filter: blur(10px);
+      border-radius: 16px; padding: 16px; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 12px;
+      cursor: pointer; transition: all 0.15s;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .reward-card:active { transform: scale(0.98); }
+    .reward-icon { font-size: 40px; }
+    .reward-info { flex: 1; }
+    .reward-name { font-size: 17px; font-weight: 700; }
+    .reward-desc { font-size: 12px; opacity: 0.7; margin-top: 2px; }
+    .reward-cost { font-size: 14px; font-weight: 700; color: #FFD700; }
+
+    /* 弹窗 */
+    .toast {
+      position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.85); color: #fff; padding: 12px 28px;
+      border-radius: 100px; font-size: 20px; font-weight: 700;
+      z-index: 999; pointer-events: none;
+      opacity: 0; transition: opacity 0.2s;
+    }
+    .toast.show { opacity: 1; }
+
+    /* 空状态 */
+    .empty { text-align: center; padding: 60px 20px; opacity: 0.6; }
+    .empty .icon { font-size: 48px; margin-bottom: 12px; }
+    .empty .text { font-size: 15px; }
+
+    .loading { text-align: center; padding: 40px; opacity: 0.6; }
+  </style>
+</head>
+<body>
+  <div class="toast" id="toast"></div>
+
+  <div class="container">
+    <!-- 首页 -->
+    <div class="page active" id="page-home">
+      <div class="header">
+        <div class="balance" id="balance">0</div>
+        <div class="balance-label">当前积分</div>
+        <div class="today-info">
+          今日 <span id="todayEarn">+0</span>
+        </div>
+      </div>
+      <div class="section-title">✨ 快速打卡</div>
+      <div class="btn-grid" id="btnGrid"></div>
+    </div>
+
+    <!-- 奖励页 -->
+    <div class="page" id="page-rewards">
+      <div class="section-title">🎁 积分兑换</div>
+      <div id="rewardsList"></div>
+    </div>
+
+    <!-- 记录页 -->
+    <div class="page" id="page-logs">
+      <div class="section-title">📋 最近记录</div>
+      <div id="logsList"></div>
+    </div>
+  </div>
+
+  <!-- 底部导航 -->
+  <div class="tabs">
+    <div class="tab active" data-page="page-home">
+      <span class="tab-icon">⭐</span>打卡
+    </div>
+    <div class="tab" data-page="page-rewards">
+      <span class="tab-icon">🎁</span>奖励
+    </div>
+    <div class="tab" data-page="page-logs">
+      <span class="tab-icon">📋</span>记录
+    </div>
+  </div>
+
+  <script>
+    const API = '';
+    const USER_ID = 1; // 默认第一个用户（孩子）
+
+    // ── 工具 ──
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 1500);
+    }
+
+    async function api(path, opts = {}) {
+      const res = await fetch(API + path, {
+        headers: { 'Content-Type': 'application/json' },
+        ...opts,
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+      });
+      return res.json();
+    }
+
+    // ── 页面切换 ──
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.page).classList.add('active');
+
+        if (tab.dataset.page === 'page-rewards') loadRewards();
+        if (tab.dataset.page === 'page-logs') loadLogs();
+      });
+    });
+
+    // ── 加载积分项 + 余额 ──
+    async function loadHome() {
+      const [items, stats] = await Promise.all([
+        api('/api/point-items'),
+        api('/api/stats/' + USER_ID),
+      ]);
+
+      document.getElementById('balance').textContent = stats.balance || 0;
+      document.getElementById('todayEarn').textContent = '+' + (stats.today_total || 0);
+
+      const grid = document.getElementById('btnGrid');
+      grid.innerHTML = items.map(item => `
+        <div class="btn-item" onclick="clock(${item.id}, '${item.label}', ${item.points})">
+          <span class="icon">${item.icon || '✨'}</span>
+          <div class="label">${item.label}</div>
+          <div class="points">+${item.points} 分</div>
+        </div>
+      `).join('');
+    }
+
+    // ── 打卡 ──
+    async function clock(itemId, label, points) {
+      const btn = event.currentTarget;
+      btn.style.pointerEvents = 'none';
+      try {
+        const res = await api('/api/clock', {
+          method: 'POST',
+          body: { user_id: USER_ID, item_id: itemId },
+        });
+        if (res.ok) {
+          showToast(`+${res.points_added} 分！`);
+          document.getElementById('balance').textContent = res.new_balance;
+          // 刷新今日
+          const stats = await api('/api/stats/' + USER_ID);
+          document.getElementById('todayEarn').textContent = '+' + (stats.today_total || 0);
+        } else {
+          showToast('❌ ' + (res.error || '失败'));
+        }
+      } catch (e) {
+        showToast('⚠️ 网络错误');
+      }
+      setTimeout(() => { btn.style.pointerEvents = 'auto'; }, 300);
+    }
+
+    // ── 加载奖励 ──
+    async function loadRewards() {
+      const [rewards, stats] = await Promise.all([
+        api('/api/rewards'),
+        api('/api/stats/' + USER_ID),
+      ]);
+      const balance = stats.balance || 0;
+      const list = document.getElementById('rewardsList');
+
+      if (!rewards.length) {
+        list.innerHTML = '<div class="empty"><div class="icon">🎁</div><div class="text">还没有奖励，让家长来配置吧～</div></div>';
+        return;
+      }
+
+      list.innerHTML = rewards.map(r => `
+        <div class="reward-card" onclick="redeem(${r.id}, '${r.name.replace(/'/g, "\\'")}', ${r.cost})">
+          <div class="reward-icon">🎁</div>
+          <div class="reward-info">
+            <div class="reward-name">${r.name}</div>
+            <div class="reward-desc">${r.description || ''}</div>
+          </div>
+          <div class="reward-cost" style="color: ${balance >= r.cost ? '#FFD700' : '#FF5252'}">
+            ${r.cost} 分
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // ── 兑换 ──
+    async function redeem(rewardId, name, cost) {
+      if (!confirm(`确定要兑换「${name}」吗？需要 ${cost} 分。`)) return;
+      const res = await api('/api/redeem', {
+        method: 'POST',
+        body: { user_id: USER_ID, reward_id: rewardId },
+      });
+      if (res.ok) {
+        showToast(res.status === 'fulfilled' ? '✅ 兑换成功！' : '📨 已提交，等待家长审批');
+        document.getElementById('balance').textContent = res.new_balance;
+        loadRewards();
+      } else {
+        showToast('❌ ' + (res.error || '积分不足'));
+      }
+    }
+
+    // ── 加载流水 ──
+    async function loadLogs() {
+      const logs = await api('/api/logs/' + USER_ID);
+      const list = document.getElementById('logsList');
+
+      if (!logs.length) {
+        list.innerHTML = '<div class="empty"><div class="icon">📋</div><div class="text">还没有记录，先打卡试试吧！</div></div>';
+        return;
+      }
+
+      list.innerHTML = `<ul class="log-list">${logs.map(log => {
+        const time = new Date(log.created_at + 'Z').toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        return `
+          <li class="log-item">
+            <div class="log-icon">${log.icon || (log.change > 0 ? '⭐' : '💸')}</div>
+            <div class="log-info">
+              <div class="log-reason">${log.item_label || log.reason || '积分变动'}</div>
+              <div class="log-time">${time}</div>
+            </div>
+            <div class="log-change ${log.change > 0 ? 'positive' : 'negative'}">
+              ${log.change > 0 ? '+' : ''}${log.change}
+            </div>
+          </li>
+        `;
+      }).join('')}</ul>`;
+    }
+
+    // ── 启动 ──
+    loadHome();
+    // 定期刷新余额
+    setInterval(async () => {
+      const stats = await api('/api/stats/' + USER_ID);
+      document.getElementById('balance').textContent = stats.balance || 0;
+      document.getElementById('todayEarn').textContent = '+' + (stats.today_total || 0);
+    }, 30000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  api:
+    build: .
+    ports:
+      - "3003:3003"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PORT=3003
+    restart: unless-stopped

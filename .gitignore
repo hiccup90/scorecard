@@ -1,0 +1,28 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Runtime data
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Android local/build files
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Logs
+*.log
+
+# Env
+.env
+.env.*
+!.env.example

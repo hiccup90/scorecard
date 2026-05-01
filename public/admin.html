@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>积分管理 - 家长后台</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0f0f23; --card: #1a1a2e; --border: #2a2a4a;
+      --primary: #667eea; --accent: #764ba2;
+      --text: #e0e0f0; --muted: #8888aa; --green: #4CAF50; --red: #FF5252;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .wrap { max-width: 800px; margin: 0 auto; padding: 20px 16px 100px; }
+
+    /* 顶部 */
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 0 20px; }
+    .topbar h1 { font-size: 22px; font-weight: 800; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .topbar .user-badge { font-size: 13px; color: var(--muted); }
+
+    /* 概览卡片 */
+    .overview { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
+    .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; text-align: center; }
+    .stat-card .val { font-size: 32px; font-weight: 800; color: #FFD700; }
+    .stat-card .lab { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+    /* Tab 切换 */
+    .tabs { display: flex; gap: 4px; margin-bottom: 20px; background: var(--card); border-radius: 12px; padding: 4px; }
+    .tab-btn { flex: 1; padding: 10px 8px; text-align: center; border: none; background: none; color: var(--muted); font-size: 14px; font-weight: 600; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+    .tab-btn.active { background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* 列表项 */
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .section-title { font-size: 16px; font-weight: 700; }
+    .btn { padding: 8px 16px; border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+    .btn-primary { background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; }
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-red { background: var(--red); color: #fff; }
+    .btn:hover { opacity: 0.85; }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+    .card-row { display: flex; align-items: center; gap: 12px; }
+    .card-icon { font-size: 28px; flex-shrink: 0; }
+    .card-body { flex: 1; min-width: 0; }
+    .card-title { font-size: 15px; font-weight: 700; }
+    .card-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .card-action { display: flex; gap: 8px; flex-shrink: 0; }
+
+    /* 表单 */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-group.full { grid-column: 1 / -1; }
+    label { font-size: 12px; color: var(--muted); }
+    input, select, textarea { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 8px 12px; font-size: 14px; width: 100%; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); }
+
+    /* 弹窗 */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
+    .modal-overlay.show { display: flex; }
+    .modal { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 24px; width: 100%; max-width: 420px; }
+    .modal h2 { font-size: 18px; margin-bottom: 16px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+    .modal-actions .btn { flex: 1; }
+    .btn-cancel { background: var(--border); color: var(--text); }
+
+    /* 奖励项 */
+    .reward-card { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+    .reward-card .r-icon { font-size: 32px; }
+    .reward-card .r-body { flex: 1; }
+    .reward-card .r-name { font-size: 15px; font-weight: 700; }
+    .reward-card .r-cost { font-size: 13px; color: #FFD700; margin-top: 2px; }
+    .reward-card .r-actions { display: flex; gap: 6px; }
+
+    /* 空状态 */
+    .empty { text-align: center; padding: 48px 20px; color: var(--muted); }
+    .empty .icon { font-size: 48px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <h1>🛡️ 家长管理</h1>
+      <span class="user-badge">管理员</span>
+    </div>
+
+    <!-- 概览 -->
+    <div class="overview">
+      <div class="stat-card">
+        <div class="val" id="statBalance">-</div>
+        <div class="lab">当前积分</div>
+      </div>
+      <div class="stat-card">
+        <div class="val" id="statToday">-</div>
+        <div class="lab">今日获得</div>
+      </div>
+      <div class="stat-card">
+        <div class="val" id="statRedemptions">-</div>
+        <div class="lab">待审批</div>
+      </div>
+    </div>
+
+    <!-- 标签页 -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="tab-log">积分记录</button>
+      <button class="tab-btn" data-tab="tab-items">打卡项</button>
+      <button class="tab-btn" data-tab="tab-rewards">奖励</button>
+      <button class="tab-btn" data-tab="tab-adjust">调分</button>
+    </div>
+
+    <!-- 积分记录 -->
+    <div class="tab-content active" id="tab-log">
+      <div class="section-header">
+        <span class="section-title">📋 积分流水</span>
+        <select id="filterUser" onchange="loadLogs()" style="width:auto;font-size:13px;padding:6px 10px;">
+          <option value="1">全部孩子</option>
+        </select>
+      </div>
+      <div id="logsList"></div>
+    </div>
+
+    <!-- 打卡项配置 -->
+    <div class="tab-content" id="tab-items">
+      <div class="section-header">
+        <span class="section-title">⭐ 打卡项目配置</span>
+        <button class="btn btn-primary" onclick="openItemModal()">+ 新增</button>
+      </div>
+      <div id="itemsList"></div>
+    </div>
+
+    <!-- 奖励配置 -->
+    <div class="tab-content" id="tab-rewards">
+      <div class="section-header">
+        <span class="section-title">🎁 奖励配置</span>
+        <button class="btn btn-primary" onclick="openRewardModal()">+ 新增</button>
+      </div>
+      <div id="rewardsList"></div>
+    </div>
+
+    <!-- 手工调分 -->
+    <div class="tab-content" id="tab-adjust">
+      <div class="section-header">
+        <span class="section-title">⚖️ 手工调整积分</span>
+      </div>
+      <div class="card">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>选择孩子</label>
+            <select id="adjUser"><option value="1">孩子</option></select>
+          </div>
+          <div class="form-group">
+            <label>调整分值（负数即扣分）</label>
+            <input type="number" id="adjChange" placeholder="如 5 或 -10">
+          </div>
+          <div class="form-group full">
+            <label>原因说明</label>
+            <input type="text" id="adjReason" placeholder="如：今天很棒！/ 扣分原因">
+          </div>
+        </div>
+        <button class="btn btn-green" onclick="doAdjust()" style="margin-top:8px;width:100%;">确认调整</button>
+      </div>
+
+      <div class="section-header" style="margin-top:24px;">
+        <span class="section-title">📥 待审批兑换</span>
+      </div>
+      <div id="pendingRedemptions"></div>
+    </div>
+  </div>
+
+  <!-- 新增/编辑打卡项弹窗 -->
+  <div class="modal-overlay" id="itemModal">
+    <div class="modal">
+      <h2 id="itemModalTitle">新增打卡项</h2>
+      <input type="hidden" id="itemId">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>名称</label>
+          <input type="text" id="itemLabel" placeholder="如：写作业">
+        </div>
+        <div class="form-group">
+          <label>积分</label>
+          <input type="number" id="itemPoints" placeholder="5">
+        </div>
+        <div class="form-group">
+          <label>图标</label>
+          <input type="text" id="itemIcon" placeholder="📚">
+        </div>
+        <div class="form-group full">
+          <label>颜色</label>
+          <input type="color" id="itemColor" value="#6C63FF" style="height:40px;padding:2px;">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeItemModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveItem()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新增/编辑奖励弹窗 -->
+  <div class="modal-overlay" id="rewardModal">
+    <div class="modal">
+      <h2 id="rewardModalTitle">新增奖励</h2>
+      <input type="hidden" id="rewardId">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>奖励名称</label>
+          <input type="text" id="rewardName" placeholder="如：去游乐园">
+        </div>
+        <div class="form-group">
+          <label>所需积分</label>
+          <input type="number" id="rewardCost" placeholder="100">
+        </div>
+        <div class="form-group">
+          <label>库存（-1 无限）</label>
+          <input type="number" id="rewardStock" value="-1">
+        </div>
+        <div class="form-group full">
+          <label>描述</label>
+          <input type="text" id="rewardDesc" placeholder="可选描述">
+        </div>
+        <div class="form-group full">
+          <label>自动通过审批</label>
+          <select id="rewardAutoApprove">
+            <option value="1">是（立即扣积分）</option>
+            <option value="0">否（需手动审批）</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeRewardModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveReward()">保存</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const API = '';
+const USER_ID = 1; // 孩子 ID
+
+// ── API ──
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  return res.json();
+}
+
+// ── Tab 切换 ──
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ── 概览 ──
+async function loadOverview() {
+  const [stats, redemptions] = await Promise.all([
+    api('/api/stats/1'),
+    api('/api/redemptions'),
+  ]);
+  document.getElementById('statBalance').textContent = stats.balance ?? 0;
+  document.getElementById('statToday').textContent = '+' + (stats.today_total ?? 0);
+  const pending = redemptions.filter(r => r.status === 'pending').length;
+  document.getElementById('statRedemptions').textContent = pending;
+  if (pending > 0) document.getElementById('statRedemptions').style.color = '#FF5252';
+}
+
+// ── 积分记录 ──
+async function loadLogs() {
+  const logs = await api('/api/logs/1');
+  const list = document.getElementById('logsList');
+  if (!logs.length) {
+    list.innerHTML = '<div class="empty"><div class="icon">📋</div><div>暂无记录</div></div>';
+    return;
+  }
+  list.innerHTML = logs.map(log => {
+    const time = new Date(log.created_at + 'Z').toLocaleString('zh-CN');
+    return `
+      <div class="card">
+        <div class="card-row">
+          <div class="card-icon">${log.icon || '⭐'}</div>
+          <div class="card-body">
+            <div class="card-title">${log.item_label || log.reason || '积分变动'}</div>
+            <div class="card-meta">${time}</div>
+          </div>
+          <div style="font-size:18px;font-weight:800;color:${log.change > 0 ? '#4CAF50' : '#FF5252'}">
+            ${log.change > 0 ? '+' : ''}${log.change}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── 打卡项 ──
+async function loadItems() {
+  const items = await api('/api/point-items');
+  const list = document.getElementById('itemsList');
+  if (!items.length) {
+    list.innerHTML = '<div class="empty"><div class="icon">⭐</div><div>还没有打卡项</div></div>';
+    return;
+  }
+  list.innerHTML = items.map(item => `
+    <div class="card">
+      <div class="card-row">
+        <div class="card-icon">${item.icon || '⭐'}</div>
+        <div class="card-body">
+          <div class="card-title">${item.label}</div>
+          <div class="card-meta">${item.points} 分 · ${item.enabled ? '启用' : '禁用'}</div>
+        </div>
+        <div class="card-action">
+          <button class="btn" style="background:var(--border);font-size:12px;" onclick="editItem(${item.id}, '${item.label}', ${item.points}, '${item.icon}', '${item.color}')">编辑</button>
+          <button class="btn btn-red" style="font-size:12px;" onclick="deleteItem(${item.id})">删除</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openItemModal() {
+  document.getElementById('itemId').value = '';
+  document.getElementById('itemLabel').value = '';
+  document.getElementById('itemPoints').value = '';
+  document.getElementById('itemIcon').value = '✨';
+  document.getElementById('itemColor').value = '#6C63FF';
+  document.getElementById('itemModalTitle').textContent = '新增打卡项';
+  document.getElementById('itemModal').classList.add('show');
+}
+
+function editItem(id, label, points, icon, color) {
+  document.getElementById('itemId').value = id;
+  document.getElementById('itemLabel').value = label;
+  document.getElementById('itemPoints').value = points;
+  document.getElementById('itemIcon').value = icon;
+  document.getElementById('itemColor').value = color;
+  document.getElementById('itemModalTitle').textContent = '编辑打卡项';
+  document.getElementById('itemModal').classList.add('show');
+}
+
+function closeItemModal() {
+  document.getElementById('itemModal').classList.remove('show');
+}
+
+async function saveItem() {
+  const id = document.getElementById('itemId').value;
+  const body = {
+    label: document.getElementById('itemLabel').value,
+    points: parseInt(document.getElementById('itemPoints').value),
+    icon: document.getElementById('itemIcon').value,
+    color: document.getElementById('itemColor').value,
+    enabled: true,
+    sort_order: 0,
+  };
+  if (id) {
+    await api(`/api/point-items/${id}`, { method: 'PUT', body });
+  } else {
+    await api('/api/point-items', { method: 'POST', body });
+  }
+  closeItemModal();
+  loadItems();
+}
+
+async function deleteItem(id) {
+  if (!confirm('确定删除？')) return;
+  await api(`/api/point-items/${id}`, { method: 'DELETE' });
+  loadItems();
+}
+
+// ── 奖励 ──
+async function loadRewards() {
+  const rewards = await api('/api/rewards');
+  const list = document.getElementById('rewardsList');
+  if (!rewards.length) {
+    list.innerHTML = '<div class="empty"><div class="icon">🎁</div><div>还没有奖励</div></div>';
+    return;
+  }
+  list.innerHTML = rewards.map(r => `
+    <div class="reward-card">
+      <div class="r-icon">🎁</div>
+      <div class="r-body">
+        <div class="r-name">${r.name}</div>
+        <div class="r-cost">${r.cost} 分 · ${r.auto_approve ? '自动通过' : '需审批'} · 库存 ${r.stock < 0 ? '∞' : r.stock}</div>
+      </div>
+      <div class="r-actions">
+        <button class="btn" style="background:var(--border);font-size:12px;" onclick="editReward(${r.id}, '${r.name}', ${r.cost}, '${r.description || ''}', ${r.stock}, ${r.auto_approve})">编辑</button>
+        <button class="btn btn-red" style="font-size:12px;" onclick="deleteReward(${r.id})">删除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openRewardModal() {
+  document.getElementById('rewardId').value = '';
+  document.getElementById('rewardName').value = '';
+  document.getElementById('rewardCost').value = '';
+  document.getElementById('rewardDesc').value = '';
+  document.getElementById('rewardStock').value = '-1';
+  document.getElementById('rewardAutoApprove').value = '1';
+  document.getElementById('rewardModalTitle').textContent = '新增奖励';
+  document.getElementById('rewardModal').classList.add('show');
+}
+
+function editReward(id, name, cost, desc, stock, autoApprove) {
+  document.getElementById('rewardId').value = id;
+  document.getElementById('rewardName').value = name;
+  document.getElementById('rewardCost').value = cost;
+  document.getElementById('rewardDesc').value = desc;
+  document.getElementById('rewardStock').value = stock;
+  document.getElementById('rewardAutoApprove').value = autoApprove ? '1' : '0';
+  document.getElementById('rewardModalTitle').textContent = '编辑奖励';
+  document.getElementById('rewardModal').classList.add('show');
+}
+
+function closeRewardModal() {
+  document.getElementById('rewardModal').classList.remove('show');
+}
+
+async function saveReward() {
+  const id = document.getElementById('rewardId').value;
+  const body = {
+    name: document.getElementById('rewardName').value,
+    cost: parseInt(document.getElementById('rewardCost').value),
+    description: document.getElementById('rewardDesc').value,
+    stock: parseInt(document.getElementById('rewardStock').value),
+    auto_approve: document.getElementById('rewardAutoApprove').value === '1',
+    enabled: true,
+  };
+  if (id) {
+    await api(`/api/rewards/${id}`, { method: 'PUT', body });
+  } else {
+    await api('/api/rewards', { method: 'POST', body });
+  }
+  closeRewardModal();
+  loadRewards();
+}
+
+async function deleteReward(id) {
+  if (!confirm('确定删除？')) return;
+  await api(`/api/rewards/${id}`, { method: 'DELETE' });
+  loadRewards();
+}
+
+// ── 手工调分 ──
+async function doAdjust() {
+  const user_id = parseInt(document.getElementById('adjUser').value);
+  const change = parseInt(document.getElementById('adjChange').value);
+  const reason = document.getElementById('adjReason').value;
+  if (!change) { alert('请输入分值'); return; }
+  await api('/api/adjust', { method: 'POST', body: { user_id, change, reason, parent_id: 1 } });
+  document.getElementById('adjChange').value = '';
+  document.getElementById('adjReason').value = '';
+  loadOverview();
+  loadLogs();
+}
+
+// ── 待审批兑换 ──
+async function loadPendingRedemptions() {
+  const rows = await api('/api/redemptions');
+  const pending = rows.filter(r => r.status === 'pending');
+  const list = document.getElementById('pendingRedemptions');
+  if (!pending.length) {
+    list.innerHTML = '<div class="empty"><div class="icon">✅</div><div>暂无待审批兑换</div></div>';
+    return;
+  }
+  list.innerHTML = pending.map(r => {
+    const time = new Date(r.created_at + 'Z').toLocaleString('zh-CN');
+    return `
+      <div class="card">
+        <div class="card-row">
+          <div class="card-icon">🎁</div>
+          <div class="card-body">
+            <div class="card-title">${r.user_name} 兑换「${r.reward_name}」</div>
+            <div class="card-meta">${r.cost_at_time} 分 · ${time}</div>
+          </div>
+          <div class="card-action">
+            <button class="btn btn-green" onclick="approveRedemption(${r.id})">通过</button>
+            <button class="btn btn-red" onclick="rejectRedemption(${r.id})">驳回</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function approveRedemption(id) {
+  if (!confirm('确认通过？积分将立即扣除。')) return;
+  await api(`/api/redemptions/${id}/approve`, { method: 'POST', body: { parent_id: 1 } });
+  loadPendingRedemptions();
+  loadOverview();
+}
+
+async function rejectRedemption(id) {
+  if (!confirm('确认驳回？')) return;
+  await api(`/api/redemptions/${id}/reject`, { method: 'POST' });
+  loadPendingRedemptions();
+}
+
+// ── 初始化 ──
+loadOverview();
+loadLogs();
+loadItems();
+loadRewards();
+loadPendingRedemptions();
+</script>
+</body>
+</html>
