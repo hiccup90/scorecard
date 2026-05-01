@@ -1,0 +1,12 @@
+node_modules/
+data/
+.git/
+.github/
+android/.gradle/
+android/build/
+android/app/build/
+*.log
+.env
+.env.*
+Dockerfile*
+README.md
