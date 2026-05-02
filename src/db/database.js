@@ -60,9 +60,19 @@ db.exec(`
   );
 `);
 
+// 默认用户（不重复插入）
+const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
+if (userCount.c === 0) {
+  const insertUser = db.prepare(
+    'INSERT INTO users (name, role, password) VALUES (?,?,?)'
+  );
+  insertUser.run('孩子', 'child', null);
+  insertUser.run('家长', 'parent', null);
+}
+
 // 默认积分项（不重复插入）
-const count = db.prepare('SELECT COUNT(*) as c FROM point_items').get();
-if (count.c === 0) {
+const itemCount = db.prepare('SELECT COUNT(*) as c FROM point_items').get();
+if (itemCount.c === 0) {
   const insert = db.prepare(
     'INSERT INTO point_items (label, points, icon, color, sort_order) VALUES (?,?,?,?,?)'
   );

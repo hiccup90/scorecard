@@ -158,7 +158,9 @@
   </div>
 
   <script>
-    const API = new URL('.', window.location.href).pathname.replace(/\/$/, '');
+    const API = window.location.pathname.endsWith('.html')
+      ? window.location.pathname.replace(/\/[^/]*$/, '')
+      : window.location.pathname.replace(/\/$/, '');
     const USER_ID = 1; // 默认第一个用户（孩子）
 
     // ── 工具 ──
