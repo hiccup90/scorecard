@@ -237,7 +237,7 @@
   </div>
 
 <script>
-const API = '';
+const API = new URL('.', window.location.href).pathname.replace(/\/$/, '');
 const USER_ID = 1; // 孩子 ID
 
 // ── API ──

@@ -136,6 +136,7 @@ app.post('/api/redeem', (req, res) => {
 
   const reward = db.prepare('SELECT * FROM rewards WHERE id = ?').get(reward_id);
   if (!reward) return res.status(404).json({ error: '奖励不存在' });
+  if (reward.stock === 0) return res.status(400).json({ error: '奖励库存不足' });
 
   const balance = getBalance(user_id);
   if (balance < reward.cost) {
@@ -143,13 +144,17 @@ app.post('/api/redeem', (req, res) => {
   }
 
   if (reward.auto_approve) {
-    // 自动通过：直接扣积分
-    db.prepare(
-      'INSERT INTO point_log (user_id, change, reason, created_by) VALUES (?,?,?,?)'
-    ).run(user_id, -reward.cost, `兑换「${reward.name}」`, user_id);
-    db.prepare(
-      'INSERT INTO redemption_requests (user_id, reward_id, cost_at_time, status) VALUES (?,?,?,?)'
-    ).run(user_id, reward_id, reward.cost, 'fulfilled');
+    db.transaction(() => {
+      db.prepare(
+        'INSERT INTO point_log (user_id, change, reason, created_by) VALUES (?,?,?,?)'
+      ).run(user_id, -reward.cost, `兑换「${reward.name}」`, user_id);
+      db.prepare(
+        'INSERT INTO redemption_requests (user_id, reward_id, cost_at_time, status) VALUES (?,?,?,?)'
+      ).run(user_id, reward_id, reward.cost, 'fulfilled');
+      if (reward.stock > 0) {
+        db.prepare('UPDATE rewards SET stock = stock - 1 WHERE id = ?').run(reward_id);
+      }
+    })();
   } else {
     // 需要审批
     db.prepare(
@@ -181,17 +186,26 @@ app.post('/api/redemptions/:id/approve', (req, res) => {
   if (!row) return res.status(404).json({ error: '不存在' });
   if (row.status !== 'pending') return res.status(400).json({ error: '状态不对' });
 
+  const reward = db.prepare('SELECT stock, name FROM rewards WHERE id = ?').get(row.reward_id);
+  if (!reward) return res.status(404).json({ error: '奖励不存在' });
+  if (reward.stock === 0) return res.status(400).json({ error: '奖励库存不足，无法审批' });
+
   const balance = getBalance(row.user_id);
   if (balance < row.cost_at_time) {
     return res.status(400).json({ error: '积分不足，无法审批' });
   }
 
-  db.prepare(
-    'INSERT INTO point_log (user_id, change, reason, created_by) VALUES (?,?,?,?)'
-  ).run(row.user_id, -row.cost_at_time, `兑换「已审批」`, req.body.parent_id);
-  db.prepare(
-    'UPDATE redemption_requests SET status=?, approved_at=datetime("now"), approved_by=? WHERE id=?'
-  ).run('fulfilled', req.body.parent_id, req.params.id);
+  db.transaction(() => {
+    db.prepare(
+      'INSERT INTO point_log (user_id, change, reason, created_by) VALUES (?,?,?,?)'
+    ).run(row.user_id, -row.cost_at_time, `兑换「${reward.name}」`, req.body.parent_id);
+    db.prepare(
+      'UPDATE redemption_requests SET status=?, approved_at=datetime("now"), approved_by=? WHERE id=?'
+    ).run('fulfilled', req.body.parent_id, req.params.id);
+    if (reward.stock > 0) {
+      db.prepare('UPDATE rewards SET stock = stock - 1 WHERE id = ?').run(row.reward_id);
+    }
+  })();
 
   res.json({ ok: true, new_balance: getBalance(row.user_id) });
 });
