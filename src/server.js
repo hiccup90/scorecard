@@ -67,6 +67,35 @@ function calcStreak(userId, itemId) {
   return { days: newDays, bonus };
 }
 
+// 回退连续打卡（驳回/撤回时用）
+function revertStreak(userId, itemId) {
+  const streak = db.prepare(
+    'SELECT * FROM streaks WHERE user_id = ? AND item_id = ?'
+  ).get(userId, itemId);
+  if (!streak) return;
+
+  if (streak.streak_days <= 1) {
+    db.prepare('DELETE FROM streaks WHERE user_id = ? AND item_id = ?').run(userId, itemId);
+    return;
+  }
+
+  // 找到上一个 confirmed 打卡日期
+  const prev = db.prepare(`
+    SELECT date(created_at) as prev_date 
+    FROM clock_requests 
+    WHERE user_id = ? AND item_id = ? AND status = 'confirmed'
+    ORDER BY created_at DESC LIMIT 1
+  `).get(userId, itemId);
+
+  if (prev) {
+    db.prepare(
+      'UPDATE streaks SET streak_days = streak_days - 1, last_date = ? WHERE user_id = ? AND item_id = ?'
+    ).run(prev.prev_date, userId, itemId);
+  } else {
+    db.prepare('DELETE FROM streaks WHERE user_id = ? AND item_id = ?').run(userId, itemId);
+  }
+}
+
 // ─── 积分项（带分类） ─────────────────────────────────────────────
 app.get('/api/point-items', (req, res) => {
   const items = db.prepare(
@@ -120,15 +149,15 @@ app.post('/api/clock', (req, res) => {
   ).get(user_id, item_id, today);
   if (todayDone) return res.status(400).json({ error: '今天已经打过卡了' });
 
-  // 计算连续打卡
-  const streak = calcStreak(user_id, item_id);
-  const totalPoints = item.points + streak.bonus;
-
-  // 立即加分 + 创建待审记录
+  // 计算连续打卡 + 立即加分 + 创建待审记录（同一事务）
+  let totalPoints, streakResult;
   db.transaction(() => {
+    streakResult = calcStreak(user_id, item_id);
+    totalPoints = item.points + streakResult.bonus;
+
     // 写入积分流水（立即生效）
-    const reason = streak.bonus > 0
-      ? `${item.label}（连续${streak.days}天+${streak.bonus}奖励）`
+    const reason = streakResult.bonus > 0
+      ? `${item.label}（连续${streakResult.days}天+${streakResult.bonus}奖励）`
       : item.label;
     db.prepare(
       'INSERT INTO point_log (user_id, item_id, change, reason, created_by) VALUES (?,?,?,?,?)'
@@ -139,14 +168,14 @@ app.post('/api/clock', (req, res) => {
       `INSERT INTO clock_requests 
        (user_id, item_id, points_at_time, streak_bonus, status, auto_approved, expires_at)
        VALUES (?,?,?,?,?,?,?)`
-    ).run(user_id, item_id, totalPoints, streak.bonus, 'confirmed', 1, addHours(new Date(), 24));
+    ).run(user_id, item_id, totalPoints, streakResult.bonus, 'pending', 0, addHours(new Date(), 24));
   })();
 
   res.json({
     ok: true,
     points_added: totalPoints,
-    streak: streak.days,
-    streak_bonus: streak.bonus,
+    streak: streakResult.days,
+    streak_bonus: streakResult.bonus,
     new_balance: getBalance(user_id),
   });
 });
@@ -177,6 +206,9 @@ app.post('/api/clock-requests/:id/reverse', (req, res) => {
       'INSERT INTO point_log (user_id, item_id, change, reason, created_by) VALUES (?,?,?,?,?)'
     ).run(row.user_id, row.item_id, -row.points_at_time, `撤回打卡：${reason || '家长撤回'}`, parent_id);
 
+    // 回退连续打卡
+    revertStreak(row.user_id, row.item_id);
+
     // 更新打卡记录状态
     db.prepare(
       `UPDATE clock_requests SET status='reversed', reversed_at=datetime('now'), 
@@ -185,6 +217,61 @@ app.post('/api/clock-requests/:id/reverse', (req, res) => {
   })();
 
   res.json({ ok: true, new_balance: getBalance(row.user_id) });
+});
+
+// 家长通过打卡审核
+app.post('/api/clock-requests/:id/approve', (req, res) => {
+  const row = db.prepare('SELECT * FROM clock_requests WHERE id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ error: '不存在' });
+  if (row.status === 'confirmed') return res.status(400).json({ error: '已通过' });
+  if (row.status === 'reversed') return res.status(400).json({ error: '已撤回' });
+
+  db.prepare(
+    `UPDATE clock_requests SET status='confirmed', confirmed_at=datetime('now') WHERE id=?`
+  ).run(req.params.id);
+
+  res.json({ ok: true });
+});
+
+// 家长驳回打卡（撤回积分）
+app.post('/api/clock-requests/:id/reject', (req, res) => {
+  const row = db.prepare('SELECT * FROM clock_requests WHERE id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ error: '不存在' });
+  if (row.status === 'reversed') return res.status(400).json({ error: '已驳回' });
+
+  const { parent_id, reason } = req.body;
+
+  db.transaction(() => {
+    db.prepare(
+      'INSERT INTO point_log (user_id, item_id, change, reason, created_by) VALUES (?,?,?,?,?)'
+    ).run(row.user_id, row.item_id, -row.points_at_time, `驳回打卡：${reason || '家长驳回'}`, parent_id);
+
+    // 回退连续打卡
+    revertStreak(row.user_id, row.item_id);
+
+    db.prepare(
+      `UPDATE clock_requests SET status='reversed', reversed_at=datetime('now'), 
+       reversed_by=?, reverse_reason=? WHERE id=?`
+    ).run(parent_id, reason || '家长驳回', row.id);
+  })();
+
+  res.json({ ok: true, new_balance: getBalance(row.user_id) });
+});
+
+// 批量通过打卡审核
+app.post('/api/clock-requests/approve-all', (req, res) => {
+  const { parent_id } = req.body;
+  const pending = db.prepare(
+    "SELECT * FROM clock_requests WHERE status = 'pending' AND user_id = 1"
+  ).all();
+
+  for (const row of pending) {
+    db.prepare(
+      `UPDATE clock_requests SET status='confirmed', confirmed_at=datetime('now') WHERE id=?`
+    ).run(row.id);
+  }
+
+  res.json({ ok: true, count: pending.length });
 });
 
 // ─── 手工调分 ──────────────────────────────────────────────────────
@@ -379,11 +466,17 @@ app.get('/api/stats/:userId', (req, res) => {
     'SELECT MAX(streak_days) as max_streak FROM streaks WHERE user_id = ?'
   ).get(userId);
 
+  // 待审核打卡数
+  const pendingClock = db.prepare(
+    "SELECT COUNT(*) as c FROM clock_requests WHERE user_id = ? AND status = 'pending'"
+  ).get(userId);
+
   res.json({
     balance,
     today_total: todayRows.total || 0,
     top_item: topItem || null,
     max_streak: topStreak?.max_streak || 0,
+    pending_clock: pendingClock.c,
   });
 });
 

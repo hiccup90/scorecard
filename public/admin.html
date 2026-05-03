@@ -11,13 +11,21 @@
       --primary: #667eea; --accent: #764ba2;
       --text: #e0e0f0; --muted: #8888aa; --green: #4CAF50; --red: #FF5252;
     }
+    [data-theme="light"] {
+      --bg: #f5f5f8; --card: #ffffff; --border: #e0e0e8;
+      --primary: #667eea; --accent: #764ba2;
+      --text: #333344; --muted: #888899; --green: #4CAF50; --red: #FF5252;
+    }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
     .wrap { max-width: 800px; margin: 0 auto; padding: 20px 16px 100px; }
 
     /* 顶部 */
     .topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 0 20px; }
     .topbar h1 { font-size: 22px; font-weight: 800; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .topbar .topbar-right { display: flex; align-items: center; gap: 12px; }
     .topbar .user-badge { font-size: 13px; color: var(--muted); }
+    .theme-btn { background: var(--card); border: 1px solid var(--border); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; color: var(--text); transition: all 0.2s; }
+    .theme-btn:hover { border-color: var(--primary); }
 
     /* 概览卡片 */
     .overview { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
@@ -26,14 +34,14 @@
     .stat-card .lab { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
     /* Tab 切换 */
-    .tabs { display: flex; gap: 4px; margin-bottom: 20px; background: var(--card); border-radius: 12px; padding: 4px; }
-    .tab-btn { flex: 1; padding: 10px 8px; text-align: center; border: none; background: none; color: var(--muted); font-size: 14px; font-weight: 600; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 20px; background: var(--card); border-radius: 12px; padding: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .tab-btn { flex: 1; min-width: fit-content; padding: 10px 8px; text-align: center; border: none; background: none; color: var(--muted); font-size: 14px; font-weight: 600; border-radius: 10px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
     .tab-btn.active { background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
     /* 列表项 */
-    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
     .section-title { font-size: 16px; font-weight: 700; }
     .btn { padding: 8px 16px; border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
     .btn-primary { background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; }
@@ -41,6 +49,7 @@
     .btn-red { background: var(--red); color: #fff; }
     .btn-orange { background: #FF9800; color: #fff; }
     .btn:hover { opacity: 0.85; }
+    .btn-full { width: 100%; padding: 12px 16px; font-size: 14px; margin-bottom: 16px; }
 
     .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
     .card-row { display: flex; align-items: center; gap: 12px; }
@@ -90,13 +99,52 @@
       font-size: 11px; font-weight: 600; margin-left: 4px;
       background: rgba(255,87,34,0.2); color: #FF5722;
     }
+
+    /* 审核区域标题 */
+    .review-section-title {
+      font-size: 16px; font-weight: 700; margin-bottom: 12px; margin-top: 4px;
+    }
+    .review-section-title:not(:first-child) { margin-top: 28px; }
+
+    /* 驳回原因 */
+    .reject-reason {
+      font-size: 11px; color: var(--red); margin-top: 2px;
+    }
+
+    /* 响应式 */
+    @media (max-width: 600px) {
+      .wrap { padding: 12px 10px 80px; }
+      .overview { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      .stat-card { padding: 12px 8px; border-radius: 12px; }
+      .stat-card .val { font-size: 24px; }
+      .stat-card .lab { font-size: 11px; }
+      .card { padding: 12px; }
+      .card-row { gap: 8px; }
+      .card-icon { font-size: 24px; }
+      .card-title { font-size: 14px; }
+      .card-action { gap: 4px; }
+      .card-action .btn { padding: 6px 10px; font-size: 11px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .modal-overlay.show { padding: 0; align-items: flex-end; }
+      .modal { max-width: 100%; border-radius: 20px 20px 0 0; padding: 20px 16px 32px; }
+      .tabs { gap: 2px; padding: 3px; }
+      .tab-btn { font-size: 12px; padding: 8px 10px; }
+      .section-header { gap: 6px; }
+      .reward-card { padding: 12px; gap: 8px; }
+      .reward-card .r-icon { font-size: 26px; }
+      .reward-card .r-name { font-size: 14px; }
+      .btn-full { padding: 10px 14px; font-size: 13px; }
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="topbar">
       <h1>🛡️ 家长管理</h1>
-      <span class="user-badge">管理员</span>
+      <div class="topbar-right">
+        <button class="theme-btn" id="themeToggle" title="切换亮/暗模式">🌓</button>
+        <span class="user-badge">管理员</span>
+      </div>
     </div>
 
     <!-- 概览 -->
@@ -110,7 +158,7 @@
         <div class="lab">今日获得</div>
       </div>
       <div class="stat-card">
-        <div class="val" id="statRedemptions">-</div>
+        <div class="val" id="statPendingClock">-</div>
         <div class="lab">待审批</div>
       </div>
     </div>
@@ -120,6 +168,7 @@
       <button class="tab-btn active" data-tab="tab-log">积分记录</button>
       <button class="tab-btn" data-tab="tab-items">打卡项</button>
       <button class="tab-btn" data-tab="tab-rewards">奖励</button>
+      <button class="tab-btn" data-tab="tab-review">审核</button>
       <button class="tab-btn" data-tab="tab-adjust">调分</button>
     </div>
 
@@ -152,6 +201,22 @@
       <div id="rewardsList"></div>
     </div>
 
+    <!-- 审核 -->
+    <div class="tab-content" id="tab-review">
+      <!-- 一键通过 -->
+      <button class="btn btn-green btn-full" id="approveAllBtn" onclick="approveAllClocks()" style="display:none;">
+        ✅ 一键通过全部 (<span id="pendingCount">0</span>条)
+      </button>
+
+      <!-- 打卡审核区 -->
+      <div class="review-section-title">📝 打卡审核</div>
+      <div id="clockReviewList"></div>
+
+      <!-- 兑换审批区 -->
+      <div class="review-section-title">📥 兑换审批</div>
+      <div id="pendingRedemptions"></div>
+    </div>
+
     <!-- 手工调分 -->
     <div class="tab-content" id="tab-adjust">
       <div class="section-header">
@@ -174,16 +239,6 @@
         </div>
         <button class="btn btn-green" onclick="doAdjust()" style="margin-top:8px;width:100%;">确认调整</button>
       </div>
-
-      <div class="section-header" style="margin-top:24px;">
-        <span class="section-title">📝 今日打卡记录</span>
-      </div>
-      <div id="pendingClockRequests"></div>
-
-      <div class="section-header" style="margin-top:24px;">
-        <span class="section-title">📥 待审批兑换</span>
-      </div>
-      <div id="pendingRedemptions"></div>
     </div>
   </div>
 
@@ -270,6 +325,25 @@ const API = window.location.pathname.endsWith('.html')
   ? window.location.pathname.replace(/\/[^/]*$/, '')
   : window.location.pathname.replace(/\/$/, '');
 const USER_ID = 1;
+const PARENT_ID = 2;
+
+// ── 主题切换 ──
+(function initTheme() {
+  const saved = localStorage.getItem('scorecard-theme');
+  if (saved) {
+    document.body.setAttribute('data-theme', saved);
+  }
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const current = document.body.getAttribute('data-theme');
+    const next = (current === 'light') ? null : 'light';
+    if (next) {
+      document.body.setAttribute('data-theme', next);
+    } else {
+      document.body.removeAttribute('data-theme');
+    }
+    localStorage.setItem('scorecard-theme', next || 'dark');
+  });
+})();
 
 // ── API ──
 async function api(path, opts = {}) {
@@ -288,20 +362,20 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(btn.dataset.tab).classList.add('active');
+    // 切换到审核 tab 时刷新数据
+    if (btn.dataset.tab === 'tab-review') loadReviewTab();
   });
 });
 
 // ── 概览 ──
 async function loadOverview() {
-  const [stats, redemptions] = await Promise.all([
-    api('/api/stats/1'),
-    api('/api/redemptions'),
-  ]);
+  const stats = await api('/api/stats/1');
   document.getElementById('statBalance').textContent = stats.balance ?? 0;
   document.getElementById('statToday').textContent = '+' + (stats.today_total ?? 0);
-  const pending = redemptions.filter(r => r.status === 'pending').length;
-  document.getElementById('statRedemptions').textContent = pending;
-  if (pending > 0) document.getElementById('statRedemptions').style.color = '#FF5252';
+  const pendingClock = stats.pending_clock ?? 0;
+  const statEl = document.getElementById('statPendingClock');
+  statEl.textContent = pendingClock;
+  statEl.style.color = pendingClock > 0 ? '#FF5252' : '';
 }
 
 // ── 积分记录 ──
@@ -348,7 +422,7 @@ async function loadItems() {
           <div class="card-meta">${item.points} 分 · ${item.enabled ? '启用' : '禁用'}</div>
         </div>
         <div class="card-action">
-          <button class="btn" style="background:var(--border);font-size:12px;" onclick="editItem(${item.id}, '${item.label}', ${item.points}, '${item.icon}', '${item.color}', '${item.category || '其他'}')">编辑</button>
+          <button class="btn" style="background:var(--border);font-size:12px;" onclick="editItem(${item.id}, '${item.label.replace(/'/g, "\\'")}', ${item.points}, '${item.icon}', '${item.color}', '${item.category || '其他'}')">编辑</button>
           <button class="btn btn-red" style="font-size:12px;" onclick="deleteItem(${item.id})">删除</button>
         </div>
       </div>
@@ -424,7 +498,7 @@ async function loadRewards() {
         <div class="r-cost">${r.cost} 分 · ${r.auto_approve ? '自动通过' : '需审批'} · 库存 ${r.stock < 0 ? '∞' : r.stock}</div>
       </div>
       <div class="r-actions">
-        <button class="btn" style="background:var(--border);font-size:12px;" onclick="editReward(${r.id}, '${r.name}', ${r.cost}, '${r.description || ''}', ${r.stock}, ${r.auto_approve})">编辑</button>
+        <button class="btn" style="background:var(--border);font-size:12px;" onclick="editReward(${r.id}, '${r.name.replace(/'/g, "\\'")}', ${r.cost}, '${(r.description || '').replace(/'/g, "\\'")}', ${r.stock}, ${r.auto_approve})">编辑</button>
         <button class="btn btn-red" style="font-size:12px;" onclick="deleteReward(${r.id})">删除</button>
       </div>
     </div>
@@ -488,59 +562,154 @@ async function doAdjust() {
   const change = parseInt(document.getElementById('adjChange').value);
   const reason = document.getElementById('adjReason').value;
   if (!change) { alert('请输入分值'); return; }
-  await api('/api/adjust', { method: 'POST', body: { user_id, change, reason, parent_id: 1 } });
+  await api('/api/adjust', { method: 'POST', body: { user_id, change, reason, parent_id: PARENT_ID } });
   document.getElementById('adjChange').value = '';
   document.getElementById('adjReason').value = '';
   loadOverview();
   loadLogs();
 }
 
-// ── 打卡记录（显示今日记录 + 可撤回） ──
-async function loadPendingClockRequests() {
-  const rows = await api('/api/clock-requests');
-  const todayStr = new Date().toISOString().slice(0, 10);
-  // 只显示今天的记录
-  const todayRows = rows.filter(r => r.created_at && r.created_at.startsWith(todayStr));
-  const list = document.getElementById('pendingClockRequests');
+// ── 审核 Tab（合并打卡审核 + 兑换审批） ──
+async function loadReviewTab() {
+  await Promise.all([
+    loadClockReview(),
+    loadPendingRedemptions(),
+  ]);
+}
 
-  if (!todayRows.length) {
-    list.innerHTML = '<div class="empty"><div class="icon">✅</div><div>今天还没有打卡记录</div></div>';
+// ── 打卡审核（按状态分组：pending / confirmed / reversed） ──
+async function loadClockReview() {
+  const rows = await api('/api/clock-requests');
+  const list = document.getElementById('clockReviewList');
+
+  if (!rows.length) {
+    list.innerHTML = '<div class="empty"><div class="icon">✅</div><div>暂无打卡记录</div></div>';
+    document.getElementById('approveAllBtn').style.display = 'none';
     return;
   }
 
-  list.innerHTML = todayRows.map(r => {
+  // 排序：pending 在前，然后按时间倒序
+  rows.sort((a, b) => {
+    const statusOrder = { pending: 0, confirmed: 1, reversed: 2 };
+    if (statusOrder[a.status] !== statusOrder[b.status]) return statusOrder[a.status] - statusOrder[b.status];
+    return new Date(b.created_at + 'Z') - new Date(a.created_at + 'Z');
+  });
+
+  // 统计 pending 数量
+  const pendingCount = rows.filter(r => r.status === 'pending').length;
+  const approveAllBtn = document.getElementById('approveAllBtn');
+  document.getElementById('pendingCount').textContent = pendingCount;
+  if (pendingCount > 0) {
+    approveAllBtn.style.display = 'block';
+  } else {
+    approveAllBtn.style.display = 'none';
+  }
+
+  list.innerHTML = rows.map(r => {
     const time = new Date(r.created_at + 'Z').toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-    const isReversed = r.status === 'reversed';
+    const dateStr = new Date(r.created_at + 'Z').toLocaleDateString('zh-CN');
     const streakInfo = r.streak_bonus > 0
       ? `<span class="streak-badge">🔥连续+${r.streak_bonus}</span>`
       : '';
+
+    // 待审核
+    if (r.status === 'pending') {
+      return `
+        <div class="card" style="border-left: 3px solid #FF9800;">
+          <div class="card-row">
+            <div class="card-icon">${r.icon || '⭐'}</div>
+            <div class="card-body">
+              <div class="card-title">${r.user_name || '孩子'} 打卡「${r.item_label}」${streakInfo} <span style="color:#FF9800;font-size:12px;">⏳待审核</span></div>
+              <div class="card-meta">+${r.points_at_time} 分 · ${dateStr} ${time}</div>
+            </div>
+            <div class="card-action">
+              <button class="btn btn-green" style="font-size:12px;" onclick="approveClock(${r.id})">通过</button>
+              <button class="btn btn-red" style="font-size:12px;" onclick="rejectClock(${r.id})">驳回</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 已通过（可撤回）
+    if (r.status === 'confirmed') {
+      return `
+        <div class="card">
+          <div class="card-row">
+            <div class="card-icon">${r.icon || '⭐'}</div>
+            <div class="card-body">
+              <div class="card-title">${r.user_name || '孩子'} 打卡「${r.item_label}」${streakInfo} <span style="color:#4CAF50;font-size:12px;">✓已通过</span></div>
+              <div class="card-meta">+${r.points_at_time} 分 · ${dateStr} ${time}</div>
+            </div>
+            <div class="card-action">
+              <button class="btn btn-orange" style="font-size:12px;" onclick="reverseClockRequest(${r.id})">撤回</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 已撤回（灰色半透明，显示驳回原因如果有）
+    const reasonHtml = r.reverse_reason
+      ? `<div class="reject-reason">驳回原因：${r.reverse_reason}</div>`
+      : '';
     return `
-      <div class="card" style="${isReversed ? 'opacity:0.5;' : ''}">
+      <div class="card" style="opacity:0.5;">
         <div class="card-row">
           <div class="card-icon">${r.icon || '⭐'}</div>
           <div class="card-body">
-            <div class="card-title">${r.user_name} 打卡「${r.item_label}」${streakInfo}</div>
-            <div class="card-meta">+${r.points_at_time} 分 · ${time} ${isReversed ? '· ❌ 已撤回' : ''}</div>
+            <div class="card-title">${r.user_name || '孩子'} 打卡「${r.item_label}」${streakInfo} <span style="color:#FF5252;font-size:12px;">❌已撤回</span></div>
+            <div class="card-meta">+${r.points_at_time} 分 · ${dateStr} ${time}</div>
+            ${reasonHtml}
           </div>
-          ${!isReversed ? `
-          <div class="card-action">
-            <button class="btn btn-orange" style="font-size:12px;" onclick="reverseClockRequest(${r.id})">撤回</button>
-          </div>
-          ` : ''}
         </div>
       </div>
     `;
   }).join('');
 }
 
+async function approveClock(id) {
+  if (!confirm('确认通过？积分已提前发放。')) return;
+  await api(`/api/clock-requests/${id}/approve`, {
+    method: 'POST',
+    body: { parent_id: PARENT_ID }
+  });
+  loadReviewTab();
+  loadOverview();
+}
+
+async function rejectClock(id) {
+  const reason = prompt('驳回原因（可选）：');
+  if (reason === null) return;
+  await api(`/api/clock-requests/${id}/reject`, {
+    method: 'POST',
+    body: { parent_id: PARENT_ID, reason: reason || '家长驳回' }
+  });
+  loadReviewTab();
+  loadOverview();
+  loadLogs();
+}
+
 async function reverseClockRequest(id) {
   const reason = prompt('撤回原因（可选）：');
-  if (reason === null) return; // 用户取消
+  if (reason === null) return;
   await api(`/api/clock-requests/${id}/reverse`, {
     method: 'POST',
-    body: { parent_id: 2, reason: reason || '家长撤回' }
+    body: { parent_id: PARENT_ID, reason: reason || '家长撤回' }
   });
-  loadPendingClockRequests();
+  loadReviewTab();
+  loadOverview();
+  loadLogs();
+}
+
+async function approveAllClocks() {
+  const count = parseInt(document.getElementById('pendingCount').textContent);
+  if (!confirm(`确认一键通过全部 ${count} 条待审核打卡？`)) return;
+  await api('/api/clock-requests/approve-all', {
+    method: 'POST',
+    body: { parent_id: PARENT_ID }
+  });
+  loadReviewTab();
   loadOverview();
   loadLogs();
 }
@@ -576,7 +745,7 @@ async function loadPendingRedemptions() {
 
 async function approveRedemption(id) {
   if (!confirm('确认通过？积分将立即扣除。')) return;
-  await api(`/api/redemptions/${id}/approve`, { method: 'POST', body: { parent_id: 2 } });
+  await api(`/api/redemptions/${id}/approve`, { method: 'POST', body: { parent_id: PARENT_ID } });
   loadPendingRedemptions();
   loadOverview();
 }
@@ -592,8 +761,6 @@ loadOverview();
 loadLogs();
 loadItems();
 loadRewards();
-loadPendingClockRequests();
-loadPendingRedemptions();
 </script>
 </body>
 </html>
