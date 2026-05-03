@@ -233,11 +233,11 @@ app.post('/api/clock-requests/:id/approve', (req, res) => {
   res.json({ ok: true });
 });
 
-// 家长驳回打卡（撤回积分）
+// 家长驳回打卡（撤回积分）— 仅限 pending 状态
 app.post('/api/clock-requests/:id/reject', (req, res) => {
   const row = db.prepare('SELECT * FROM clock_requests WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: '不存在' });
-  if (row.status === 'reversed') return res.status(400).json({ error: '已驳回' });
+  if (row.status !== 'pending') return res.status(400).json({ error: '只能驳回待审核的打卡' });
 
   const { parent_id, reason } = req.body;
 
@@ -478,6 +478,11 @@ app.get('/api/stats/:userId', (req, res) => {
     max_streak: topStreak?.max_streak || 0,
     pending_clock: pendingClock.c,
   });
+});
+
+// /admin 路由 — 必须在 SPA fallback 前
+app.get('/admin', (req, res) => {
+  res.sendFile(join(__dirname, '../public/admin.html'));
 });
 
 // SPA fallback

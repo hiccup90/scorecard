@@ -761,6 +761,9 @@ loadOverview();
 loadLogs();
 loadItems();
 loadRewards();
+
+// 每 30 秒刷新概览卡片
+setInterval(loadOverview, 30000);
 </script>
 </body>
 </html>
