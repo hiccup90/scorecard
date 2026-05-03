@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>积分打卡 - 孩子端</title>
+  <title>积分打卡</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -14,10 +14,18 @@
     .container { max-width: 420px; margin: 0 auto; padding: 20px; }
 
     /* 头部 */
-    .header { text-align: center; padding: 30px 0 20px; }
+    .header { text-align: center; padding: 30px 0 20px; position: relative; }
+    .balance-wrap { position: relative; display: inline-block; }
     .balance {
       font-size: 64px; font-weight: 800; letter-spacing: -2px;
       text-shadow: 0 4px 12px rgba(0,0,0,0.2); line-height: 1;
+      transition: transform 0.3s;
+    }
+    .balance.bump { animation: bumpScale 0.4s ease-out; }
+    @keyframes bumpScale {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+      100% { transform: scale(1); }
     }
     .balance-label { font-size: 14px; opacity: 0.8; margin-top: 4px; }
     .today-info {
@@ -26,11 +34,37 @@
     }
     .today-info span { font-weight: 700; }
 
-    /* 快捷按钮区 */
-    .section-title {
-      font-size: 16px; font-weight: 600; margin: 24px 0 12px;
-      padding-left: 4px; opacity: 0.9;
+    /* 飞分动画 */
+    .fly-points {
+      position: fixed; pointer-events: none; z-index: 999;
+      font-size: 28px; font-weight: 800; color: #FFD700;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      animation: flyUp 1s ease-out forwards;
     }
+    @keyframes flyUp {
+      0% { opacity: 1; transform: translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateY(-80px) scale(1.3); }
+    }
+
+    /* 学科 tab */
+    .category-tabs {
+      display: flex; gap: 6px; margin: 20px 0 14px;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      scrollbar-width: none; padding: 2px 0;
+    }
+    .category-tabs::-webkit-scrollbar { display: none; }
+    .cat-tab {
+      flex-shrink: 0; padding: 8px 16px; border-radius: 20px;
+      background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2);
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: all 0.2s; white-space: nowrap;
+      -webkit-tap-highlight-color: transparent; user-select: none;
+    }
+    .cat-tab.active {
+      background: rgba(255,255,255,0.35); border-color: rgba(255,255,255,0.5);
+    }
+
+    /* 快捷按钮区 */
     .btn-grid {
       display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
     }
@@ -40,12 +74,26 @@
       border-radius: 16px; padding: 18px 8px; text-align: center;
       cursor: pointer; transition: all 0.15s;
       -webkit-tap-highlight-color: transparent;
-      user-select: none;
+      user-select: none; position: relative;
     }
     .btn-item:active { transform: scale(0.95); background: rgba(255,255,255,0.3); }
+    .btn-item.done {
+      opacity: 0.45; pointer-events: none;
+      background: rgba(255,255,255,0.08);
+    }
     .btn-item .icon { font-size: 36px; display: block; margin-bottom: 6px; }
     .btn-item .label { font-size: 14px; font-weight: 600; }
     .btn-item .points { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+    .btn-item .streak-badge {
+      position: absolute; top: -6px; right: -6px;
+      background: #FF5722; color: #fff; font-size: 11px; font-weight: 800;
+      border-radius: 12px; padding: 2px 7px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    .btn-item.done-label::after {
+      content: '✓ 已打卡'; position: absolute; bottom: 6px; left: 0; right: 0;
+      font-size: 11px; color: #4CAF50; font-weight: 700;
+    }
 
     /* 底部导航 */
     .tabs {
@@ -121,25 +169,28 @@
     <!-- 首页 -->
     <div class="page active" id="page-home">
       <div class="header">
-        <div class="balance" id="balance">0</div>
+        <div class="balance-wrap">
+          <div class="balance" id="balance">0</div>
+        </div>
         <div class="balance-label">当前积分</div>
         <div class="today-info">
           今日 <span id="todayEarn">+0</span>
+          · 最长连续 <span id="maxStreak">0</span> 天 🔥
         </div>
       </div>
-      <div class="section-title">✨ 快速打卡</div>
+      <div class="category-tabs" id="categoryTabs"></div>
       <div class="btn-grid" id="btnGrid"></div>
     </div>
 
     <!-- 奖励页 -->
     <div class="page" id="page-rewards">
-      <div class="section-title">🎁 积分兑换</div>
+      <div style="font-size:16px;font-weight:600;margin:24px 0 12px;padding-left:4px;">🎁 积分兑换</div>
       <div id="rewardsList"></div>
     </div>
 
     <!-- 记录页 -->
     <div class="page" id="page-logs">
-      <div class="section-title">📋 最近记录</div>
+      <div style="font-size:16px;font-weight:600;margin:24px 0 12px;padding-left:4px;">📋 最近记录</div>
       <div id="logsList"></div>
     </div>
   </div>
@@ -161,13 +212,27 @@
     const API = window.location.pathname.endsWith('.html')
       ? window.location.pathname.replace(/\/[^/]*$/, '')
       : window.location.pathname.replace(/\/$/, '');
-    const USER_ID = 1; // 默认第一个用户（孩子）
+    const USER_ID = 1;
+
+    let allItems = [];
+    let allStreaks = [];
+    let activeCategory = null;
 
     // ── 工具 ──
     function showToast(msg) {
       const t = document.getElementById('toast');
       t.textContent = msg; t.classList.add('show');
       setTimeout(() => t.classList.remove('show'), 1500);
+    }
+
+    function flyPoints(text, x, y) {
+      const el = document.createElement('div');
+      el.className = 'fly-points';
+      el.textContent = text;
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 1000);
     }
 
     async function api(path, opts = {}) {
@@ -192,48 +257,128 @@
       });
     });
 
-    // ── 加载积分项 + 余额 ──
+    // ── 加载积分项 + 余额 + 连续打卡 ──
     async function loadHome() {
-      const [items, stats] = await Promise.all([
+      const [items, stats, streaks] = await Promise.all([
         api('/api/point-items'),
         api('/api/stats/' + USER_ID),
+        api('/api/streaks/' + USER_ID),
       ]);
+
+      allItems = items;
+      allStreaks = streaks;
 
       document.getElementById('balance').textContent = stats.balance || 0;
       document.getElementById('todayEarn').textContent = '+' + (stats.today_total || 0);
+      document.getElementById('maxStreak').textContent = stats.max_streak || 0;
 
+      // 构建分类 tab
+      const categories = [...new Set(items.map(i => i.category))];
+      const tabsEl = document.getElementById('categoryTabs');
+      if (categories.length > 1) {
+        tabsEl.style.display = 'flex';
+        tabsEl.innerHTML = `<div class="cat-tab active" data-cat="all">全部</div>` +
+          categories.map(c => `<div class="cat-tab" data-cat="${c}">${c}</div>`).join('');
+        tabsEl.querySelectorAll('.cat-tab').forEach(t => {
+          t.addEventListener('click', () => {
+            tabsEl.querySelectorAll('.cat-tab').forEach(x => x.classList.remove('active'));
+            t.classList.add('active');
+            activeCategory = t.dataset.cat === 'all' ? null : t.dataset.cat;
+            renderButtons();
+          });
+        });
+      } else {
+        tabsEl.style.display = 'none';
+      }
+
+      activeCategory = null;
+      renderButtons();
+
+      // 检查今天已打过的项（通过检查 point_log 中今天该 item 的记录）
+      const logs = await api('/api/logs/' + USER_ID);
+      const todayStr = new Date().toISOString().slice(0, 10);
+      window._todayDoneItems = new Set();
+      for (const log of logs) {
+        if (log.item_id && log.created_at && log.created_at.startsWith(todayStr) && log.change > 0) {
+          window._todayDoneItems.add(log.item_id);
+        }
+      }
+      renderButtons();
+    }
+
+    function renderButtons() {
       const grid = document.getElementById('btnGrid');
-      grid.innerHTML = items.map(item => `
-        <div class="btn-item" onclick="clock(${item.id}, '${item.label}', ${item.points})">
-          <span class="icon">${item.icon || '✨'}</span>
-          <div class="label">${item.label}</div>
-          <div class="points">+${item.points} 分</div>
-        </div>
-      `).join('');
+      const filtered = activeCategory
+        ? allItems.filter(i => i.category === activeCategory)
+        : allItems;
+
+      const streakMap = {};
+      allStreaks.forEach(s => { streakMap[s.item_id] = s.streak_days; });
+
+      grid.innerHTML = filtered.map(item => {
+        const done = window._todayDoneItems?.has(item.id);
+        const streak = streakMap[item.id] || 0;
+        return `
+          <div class="btn-item ${done ? 'done done-label' : ''}" 
+               ${done ? '' : `onclick="clock(${item.id}, this)"`}>
+            ${streak >= 2 ? `<div class="streak-badge">🔥${streak}</div>` : ''}
+            <span class="icon">${item.icon || '✨'}</span>
+            <div class="label">${item.label}</div>
+            <div class="points">+${item.points} 分</div>
+          </div>
+        `;
+      }).join('');
     }
 
     // ── 打卡 ──
-    async function clock(itemId, label, points) {
-      const btn = event.currentTarget;
-      btn.style.pointerEvents = 'none';
+    async function clock(itemId, btnEl) {
+      if (btnEl.dataset.loading === '1') return;
+      btnEl.dataset.loading = '1';
+      btnEl.style.pointerEvents = 'none';
+      btnEl.style.opacity = '0.6';
       try {
         const res = await api('/api/clock', {
           method: 'POST',
           body: { user_id: USER_ID, item_id: itemId },
         });
         if (res.ok) {
-          showToast(`+${res.points_added} 分！`);
-          document.getElementById('balance').textContent = res.new_balance;
-          // 刷新今日
-          const stats = await api('/api/stats/' + USER_ID);
-          document.getElementById('todayEarn').textContent = '+' + (stats.today_total || 0);
+          // 飞分动画
+          const rect = btnEl.getBoundingClientRect();
+          const flyText = res.streak_bonus > 0
+            ? `+${res.points_added} 🔥连${res.streak}天`
+            : `+${res.points_added}`;
+          flyPoints(flyText, rect.left + rect.width / 2 - 30, rect.top);
+
+          // 余额跳动
+          const balEl = document.getElementById('balance');
+          balEl.textContent = res.new_balance;
+          balEl.classList.remove('bump');
+          void balEl.offsetWidth;
+          balEl.classList.add('bump');
+
+          // 更新今日获得
+          const todayEl = document.getElementById('todayEarn');
+          const current = parseInt(todayEl.textContent.replace('+', '')) || 0;
+          todayEl.textContent = '+' + (current + res.points_added);
+
+          // 标记已打卡
+          window._todayDoneItems.add(itemId);
+          renderButtons();
+
+          showToast(res.streak_bonus > 0
+            ? `🔥 连续${res.streak}天！+${res.points_added}分`
+            : `✅ +${res.points_added} 分！`
+          );
         } else {
           showToast('❌ ' + (res.error || '失败'));
         }
       } catch (e) {
         showToast('⚠️ 网络错误');
+      } finally {
+        btnEl.dataset.loading = '0';
+        btnEl.style.pointerEvents = 'auto';
+        btnEl.style.opacity = '1';
       }
-      setTimeout(() => { btn.style.pointerEvents = 'auto'; }, 300);
     }
 
     // ── 加载奖励 ──
@@ -309,7 +454,6 @@
 
     // ── 启动 ──
     loadHome();
-    // 定期刷新余额
     setInterval(async () => {
       const stats = await api('/api/stats/' + USER_ID);
       document.getElementById('balance').textContent = stats.balance || 0;

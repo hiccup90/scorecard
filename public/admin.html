@@ -39,6 +39,7 @@
     .btn-primary { background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; }
     .btn-green { background: var(--green); color: #fff; }
     .btn-red { background: var(--red); color: #fff; }
+    .btn-orange { background: #FF9800; color: #fff; }
     .btn:hover { opacity: 0.85; }
 
     .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
@@ -77,6 +78,18 @@
     /* 空状态 */
     .empty { text-align: center; padding: 48px 20px; color: var(--muted); }
     .empty .icon { font-size: 48px; margin-bottom: 12px; }
+
+    /* 分类标签 */
+    .cat-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 6px;
+      font-size: 11px; font-weight: 600; margin-left: 6px;
+      background: rgba(102,126,234,0.2); color: #667eea;
+    }
+    .streak-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 6px;
+      font-size: 11px; font-weight: 600; margin-left: 4px;
+      background: rgba(255,87,34,0.2); color: #FF5722;
+    }
   </style>
 </head>
 <body>
@@ -163,6 +176,11 @@
       </div>
 
       <div class="section-header" style="margin-top:24px;">
+        <span class="section-title">📝 今日打卡记录</span>
+      </div>
+      <div id="pendingClockRequests"></div>
+
+      <div class="section-header" style="margin-top:24px;">
         <span class="section-title">📥 待审批兑换</span>
       </div>
       <div id="pendingRedemptions"></div>
@@ -187,7 +205,18 @@
           <label>图标</label>
           <input type="text" id="itemIcon" placeholder="📚">
         </div>
-        <div class="form-group full">
+        <div class="form-group">
+          <label>分类</label>
+          <select id="itemCategory">
+            <option value="语文">语文</option>
+            <option value="数学">数学</option>
+            <option value="英语">英语</option>
+            <option value="生活">生活</option>
+            <option value="才艺">才艺</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label>颜色</label>
           <input type="color" id="itemColor" value="#6C63FF" style="height:40px;padding:2px;">
         </div>
@@ -240,7 +269,7 @@
 const API = window.location.pathname.endsWith('.html')
   ? window.location.pathname.replace(/\/[^/]*$/, '')
   : window.location.pathname.replace(/\/$/, '');
-const USER_ID = 1; // 孩子 ID
+const USER_ID = 1;
 
 // ── API ──
 async function api(path, opts = {}) {
@@ -302,7 +331,7 @@ async function loadLogs() {
   }).join('');
 }
 
-// ── 打卡项 ──
+// ── 打卡项（带分类） ──
 async function loadItems() {
   const items = await api('/api/point-items');
   const list = document.getElementById('itemsList');
@@ -315,11 +344,11 @@ async function loadItems() {
       <div class="card-row">
         <div class="card-icon">${item.icon || '⭐'}</div>
         <div class="card-body">
-          <div class="card-title">${item.label}</div>
+          <div class="card-title">${item.label} <span class="cat-badge">${item.category || '其他'}</span></div>
           <div class="card-meta">${item.points} 分 · ${item.enabled ? '启用' : '禁用'}</div>
         </div>
         <div class="card-action">
-          <button class="btn" style="background:var(--border);font-size:12px;" onclick="editItem(${item.id}, '${item.label}', ${item.points}, '${item.icon}', '${item.color}')">编辑</button>
+          <button class="btn" style="background:var(--border);font-size:12px;" onclick="editItem(${item.id}, '${item.label}', ${item.points}, '${item.icon}', '${item.color}', '${item.category || '其他'}')">编辑</button>
           <button class="btn btn-red" style="font-size:12px;" onclick="deleteItem(${item.id})">删除</button>
         </div>
       </div>
@@ -333,16 +362,18 @@ function openItemModal() {
   document.getElementById('itemPoints').value = '';
   document.getElementById('itemIcon').value = '✨';
   document.getElementById('itemColor').value = '#6C63FF';
+  document.getElementById('itemCategory').value = '其他';
   document.getElementById('itemModalTitle').textContent = '新增打卡项';
   document.getElementById('itemModal').classList.add('show');
 }
 
-function editItem(id, label, points, icon, color) {
+function editItem(id, label, points, icon, color, category) {
   document.getElementById('itemId').value = id;
   document.getElementById('itemLabel').value = label;
   document.getElementById('itemPoints').value = points;
   document.getElementById('itemIcon').value = icon;
   document.getElementById('itemColor').value = color;
+  document.getElementById('itemCategory').value = category || '其他';
   document.getElementById('itemModalTitle').textContent = '编辑打卡项';
   document.getElementById('itemModal').classList.add('show');
 }
@@ -358,6 +389,7 @@ async function saveItem() {
     points: parseInt(document.getElementById('itemPoints').value),
     icon: document.getElementById('itemIcon').value,
     color: document.getElementById('itemColor').value,
+    category: document.getElementById('itemCategory').value,
     enabled: true,
     sort_order: 0,
   };
@@ -463,6 +495,56 @@ async function doAdjust() {
   loadLogs();
 }
 
+// ── 打卡记录（显示今日记录 + 可撤回） ──
+async function loadPendingClockRequests() {
+  const rows = await api('/api/clock-requests');
+  const todayStr = new Date().toISOString().slice(0, 10);
+  // 只显示今天的记录
+  const todayRows = rows.filter(r => r.created_at && r.created_at.startsWith(todayStr));
+  const list = document.getElementById('pendingClockRequests');
+
+  if (!todayRows.length) {
+    list.innerHTML = '<div class="empty"><div class="icon">✅</div><div>今天还没有打卡记录</div></div>';
+    return;
+  }
+
+  list.innerHTML = todayRows.map(r => {
+    const time = new Date(r.created_at + 'Z').toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    const isReversed = r.status === 'reversed';
+    const streakInfo = r.streak_bonus > 0
+      ? `<span class="streak-badge">🔥连续+${r.streak_bonus}</span>`
+      : '';
+    return `
+      <div class="card" style="${isReversed ? 'opacity:0.5;' : ''}">
+        <div class="card-row">
+          <div class="card-icon">${r.icon || '⭐'}</div>
+          <div class="card-body">
+            <div class="card-title">${r.user_name} 打卡「${r.item_label}」${streakInfo}</div>
+            <div class="card-meta">+${r.points_at_time} 分 · ${time} ${isReversed ? '· ❌ 已撤回' : ''}</div>
+          </div>
+          ${!isReversed ? `
+          <div class="card-action">
+            <button class="btn btn-orange" style="font-size:12px;" onclick="reverseClockRequest(${r.id})">撤回</button>
+          </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function reverseClockRequest(id) {
+  const reason = prompt('撤回原因（可选）：');
+  if (reason === null) return; // 用户取消
+  await api(`/api/clock-requests/${id}/reverse`, {
+    method: 'POST',
+    body: { parent_id: 2, reason: reason || '家长撤回' }
+  });
+  loadPendingClockRequests();
+  loadOverview();
+  loadLogs();
+}
+
 // ── 待审批兑换 ──
 async function loadPendingRedemptions() {
   const rows = await api('/api/redemptions');
@@ -494,7 +576,7 @@ async function loadPendingRedemptions() {
 
 async function approveRedemption(id) {
   if (!confirm('确认通过？积分将立即扣除。')) return;
-  await api(`/api/redemptions/${id}/approve`, { method: 'POST', body: { parent_id: 1 } });
+  await api(`/api/redemptions/${id}/approve`, { method: 'POST', body: { parent_id: 2 } });
   loadPendingRedemptions();
   loadOverview();
 }
@@ -510,6 +592,7 @@ loadOverview();
 loadLogs();
 loadItems();
 loadRewards();
+loadPendingClockRequests();
 loadPendingRedemptions();
 </script>
 </body>

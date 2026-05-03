@@ -17,11 +17,57 @@ const getBalance = (userId) => {
   return row.total;
 };
 
-const todayStart = () => {
-  return new Date().toISOString().slice(0, 10) + ' 00:00:00';
+const todayKey = () => new Date().toISOString().slice(0, 10);
+
+const addHours = (date, hours) => {
+  const d = new Date(date);
+  d.setHours(d.getHours() + hours);
+  return d.toISOString();
 };
 
-// ─── 积分项 ────────────────────────────────────────────────────────
+// ─── 连续打卡计算 ─────────────────────────────────────────────────
+function calcStreak(userId, itemId) {
+  const today = todayKey();
+  const streak = db.prepare(
+    'SELECT * FROM streaks WHERE user_id = ? AND item_id = ?'
+  ).get(userId, itemId);
+
+  if (!streak) {
+    // 首次打卡，连续 1 天
+    db.prepare(
+      'INSERT INTO streaks (user_id, item_id, streak_days, last_date) VALUES (?,?,1,?)'
+    ).run(userId, itemId, today);
+    return { days: 1, bonus: 0 };
+  }
+
+  const lastDate = streak.last_date;
+  if (lastDate === today) {
+    // 今天已打过，返回当前连续天数（不应该到这里，因为有去重）
+    return { days: streak.streak_days, bonus: 0 };
+  }
+
+  // 判断是否连续：昨天打了 = 连续，否则断签重来
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayKey = yesterday.toISOString().slice(0, 10);
+
+  let newDays;
+  if (lastDate === yesterdayKey) {
+    newDays = streak.streak_days + 1;
+  } else {
+    newDays = 1; // 断签重来
+  }
+
+  db.prepare(
+    'UPDATE streaks SET streak_days = ?, last_date = ? WHERE user_id = ? AND item_id = ?'
+  ).run(newDays, today, userId, itemId);
+
+  // 额外加分：连续第2天起，每天+1，封顶+6（连续7天+）
+  const bonus = Math.min(Math.max(newDays - 1, 0), 6);
+  return { days: newDays, bonus };
+}
+
+// ─── 积分项（带分类） ─────────────────────────────────────────────
 app.get('/api/point-items', (req, res) => {
   const items = db.prepare(
     'SELECT * FROM point_items WHERE enabled = 1 ORDER BY sort_order'
@@ -29,20 +75,27 @@ app.get('/api/point-items', (req, res) => {
   res.json(items);
 });
 
+app.get('/api/categories', (req, res) => {
+  const cats = db.prepare(
+    "SELECT category FROM point_items WHERE enabled = 1 GROUP BY category ORDER BY MIN(sort_order)"
+  ).all();
+  res.json(cats.map(c => c.category));
+});
+
 app.post('/api/point-items', (req, res) => {
-  const { label, points, icon, color } = req.body;
+  const { label, points, icon, color, category } = req.body;
   const max = db.prepare('SELECT MAX(sort_order) as m FROM point_items').get();
   const result = db.prepare(
-    'INSERT INTO point_items (label, points, icon, color, sort_order) VALUES (?,?,?,?,?)'
-  ).run(label, points, icon || '✨', color || '#6C63FF', (max?.m ?? 0) + 1);
+    'INSERT INTO point_items (label, points, icon, color, category, sort_order) VALUES (?,?,?,?,?,?)'
+  ).run(label, points, icon || '✨', color || '#6C63FF', category || '其他', (max?.m ?? 0) + 1);
   res.json({ id: result.lastInsertRowid });
 });
 
 app.put('/api/point-items/:id', (req, res) => {
-  const { label, points, icon, color, enabled, sort_order } = req.body;
+  const { label, points, icon, color, category, enabled, sort_order } = req.body;
   db.prepare(
-    'UPDATE point_items SET label=?, points=?, icon=?, color=?, enabled=?, sort_order=? WHERE id=?'
-  ).run(label, points, icon, color, enabled ? 1 : 0, sort_order, req.params.id);
+    'UPDATE point_items SET label=?, points=?, icon=?, color=?, category=?, enabled=?, sort_order=? WHERE id=?'
+  ).run(label, points, icon, color, category || '其他', enabled ? 1 : 0, sort_order, req.params.id);
   res.json({ ok: true });
 });
 
@@ -51,7 +104,7 @@ app.delete('/api/point-items/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// ─── 打卡加分 ──────────────────────────────────────────────────────
+// ─── 打卡（即时满足 + 事后审核） ──────────────────────────────────
 app.post('/api/clock', (req, res) => {
   const { user_id, item_id } = req.body;
   if (!user_id || !item_id) return res.status(400).json({ error: '缺少参数' });
@@ -59,15 +112,79 @@ app.post('/api/clock', (req, res) => {
   const item = db.prepare('SELECT * FROM point_items WHERE id = ?').get(item_id);
   if (!item) return res.status(404).json({ error: '积分项不存在' });
 
-  db.prepare(
-    'INSERT INTO point_log (user_id, item_id, change, reason, created_by) VALUES (?,?,?,?,?)'
-  ).run(user_id, item_id, item.points, item.label, user_id);
+  // 今天该用户对该积分项是否已打卡（confirmed 或 pending 都算）
+  const today = todayKey();
+  const todayDone = db.prepare(
+    `SELECT id FROM clock_requests WHERE user_id = ? AND item_id = ? 
+     AND date(created_at) = ? AND status != 'reversed'`
+  ).get(user_id, item_id, today);
+  if (todayDone) return res.status(400).json({ error: '今天已经打过卡了' });
+
+  // 计算连续打卡
+  const streak = calcStreak(user_id, item_id);
+  const totalPoints = item.points + streak.bonus;
+
+  // 立即加分 + 创建待审记录
+  db.transaction(() => {
+    // 写入积分流水（立即生效）
+    const reason = streak.bonus > 0
+      ? `${item.label}（连续${streak.days}天+${streak.bonus}奖励）`
+      : item.label;
+    db.prepare(
+      'INSERT INTO point_log (user_id, item_id, change, reason, created_by) VALUES (?,?,?,?,?)'
+    ).run(user_id, item_id, totalPoints, reason, user_id);
+
+    // 创建打卡记录（24h 内家长可撤回）
+    db.prepare(
+      `INSERT INTO clock_requests 
+       (user_id, item_id, points_at_time, streak_bonus, status, auto_approved, expires_at)
+       VALUES (?,?,?,?,?,?,?)`
+    ).run(user_id, item_id, totalPoints, streak.bonus, 'confirmed', 1, addHours(new Date(), 24));
+  })();
 
   res.json({
     ok: true,
-    points_added: item.points,
+    points_added: totalPoints,
+    streak: streak.days,
+    streak_bonus: streak.bonus,
     new_balance: getBalance(user_id),
   });
+});
+
+// ─── 打卡记录（家长端） ──────────────────────────────────────────
+app.get('/api/clock-requests', (req, res) => {
+  const rows = db.prepare(`
+    SELECT cr.*, u.name as user_name, pi.label as item_label, pi.icon, pi.color, pi.category
+    FROM clock_requests cr
+    JOIN users u ON cr.user_id = u.id
+    JOIN point_items pi ON cr.item_id = pi.id
+    ORDER BY cr.created_at DESC
+  `).all();
+  res.json(rows);
+});
+
+// 家长撤回打卡（24h 内可撤回）
+app.post('/api/clock-requests/:id/reverse', (req, res) => {
+  const row = db.prepare('SELECT * FROM clock_requests WHERE id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ error: '不存在' });
+  if (row.status === 'reversed') return res.status(400).json({ error: '已经撤回过了' });
+
+  const { parent_id, reason } = req.body;
+
+  db.transaction(() => {
+    // 扣回积分
+    db.prepare(
+      'INSERT INTO point_log (user_id, item_id, change, reason, created_by) VALUES (?,?,?,?,?)'
+    ).run(row.user_id, row.item_id, -row.points_at_time, `撤回打卡：${reason || '家长撤回'}`, parent_id);
+
+    // 更新打卡记录状态
+    db.prepare(
+      `UPDATE clock_requests SET status='reversed', reversed_at=datetime('now'), 
+       reversed_by=?, reverse_reason=? WHERE id=?`
+    ).run(parent_id, reason || '家长撤回', row.id);
+  })();
+
+  res.json({ ok: true, new_balance: getBalance(row.user_id) });
 });
 
 // ─── 手工调分 ──────────────────────────────────────────────────────
@@ -98,6 +215,14 @@ app.get('/api/logs/:userId', (req, res) => {
     LIMIT 50
   `).all(req.params.userId);
   res.json(logs);
+});
+
+// ─── 连续打卡查询 ─────────────────────────────────────────────────
+app.get('/api/streaks/:userId', (req, res) => {
+  const streaks = db.prepare(
+    'SELECT * FROM streaks WHERE user_id = ?'
+  ).all(req.params.userId);
+  res.json(streaks);
 });
 
 // ─── 奖励列表 ──────────────────────────────────────────────────────
@@ -156,7 +281,6 @@ app.post('/api/redeem', (req, res) => {
       }
     })();
   } else {
-    // 需要审批
     db.prepare(
       'INSERT INTO redemption_requests (user_id, reward_id, cost_at_time, status) VALUES (?,?,?,?)'
     ).run(user_id, reward_id, reward.cost, 'pending');
@@ -234,10 +358,10 @@ app.post('/api/users', (req, res) => {
 app.get('/api/stats/:userId', (req, res) => {
   const userId = req.params.userId;
   const balance = getBalance(userId);
-  const today = todayStart();
+  const today = todayKey();
 
   const todayRows = db.prepare(
-    'SELECT SUM(change) as total FROM point_log WHERE user_id = ? AND created_at >= ?'
+    'SELECT SUM(change) as total FROM point_log WHERE user_id = ? AND date(created_at) = ?'
   ).get(userId, today);
 
   const topItem = db.prepare(`
@@ -250,10 +374,16 @@ app.get('/api/stats/:userId', (req, res) => {
     LIMIT 1
   `).get(userId);
 
+  // 当前最长连续打卡
+  const topStreak = db.prepare(
+    'SELECT MAX(streak_days) as max_streak FROM streaks WHERE user_id = ?'
+  ).get(userId);
+
   res.json({
     balance,
     today_total: todayRows.total || 0,
     top_item: topItem || null,
+    max_streak: topStreak?.max_streak || 0,
   });
 });
 
