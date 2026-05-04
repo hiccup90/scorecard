@@ -404,8 +404,11 @@
       document.getElementById('todayEarn').textContent = '+' + (stats.today_total || 0);
       document.getElementById('maxStreak').textContent = stats.max_streak || 0;
 
-      // 构建分类 tab
-      const categories = [...new Set(items.map(i => i.category))];
+      // 构建分类 tab（固定顺序）
+      const CAT_ORDER = ['语文','数学','英语','科学','生活','才艺'];
+      const uniqueCats = [...new Set(items.map(i => i.category))];
+      const categories = CAT_ORDER.filter(c => uniqueCats.includes(c))
+        .concat(uniqueCats.filter(c => !CAT_ORDER.includes(c)));
       const tabsEl = document.getElementById('categoryTabs');
       if (categories.length > 1) {
         tabsEl.style.display = 'flex';
