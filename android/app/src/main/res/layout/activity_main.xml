@@ -14,7 +14,7 @@
         android:contentDescription="设置服务器地址"
         android:elevation="8dp"
         android:padding="10dp"
-        android:src="@android:drawable/ic_menu_manage"
+        android:src="@drawable/ic_settings"
         android:tint="#FFFFFF" />
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout

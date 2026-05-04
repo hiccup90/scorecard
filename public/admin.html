@@ -297,6 +297,7 @@
             <option value="语文">语文</option>
             <option value="数学">数学</option>
             <option value="英语">英语</option>
+            <option value="科学">科学</option>
             <option value="生活">生活</option>
             <option value="才艺">才艺</option>
             <option value="其他">其他</option>
@@ -511,7 +512,9 @@ async function loadItems() {
           <div class="card-title">${item.label} <span class="cat-badge">${item.category || '其他'}</span></div>
           <div class="card-meta">${item.points} 分 · ${item.enabled ? '启用' : '禁用'}</div>
         </div>
-        <div class="card-action">
+        <div class="card-action" style="flex-wrap:wrap;gap:4px;">
+          <button class="btn" style="background:var(--border);font-size:11px;padding:4px 8px;" onclick="moveItem(${item.id},'up')">↑</button>
+          <button class="btn" style="background:var(--border);font-size:11px;padding:4px 8px;" onclick="moveItem(${item.id},'down')">↓</button>
           <button class="btn" style="background:var(--border);font-size:12px;" onclick="editItem(${item.id}, '${item.label.replace(/'/g, "\\'")}', ${item.points}, '${item.icon}', '${item.color}', '${item.category || '其他'}')">编辑</button>
           <button class="btn btn-red" style="font-size:12px;" onclick="deleteItem(${item.id})">删除</button>
         </div>
@@ -569,6 +572,11 @@ async function saveItem() {
 async function deleteItem(id) {
   if (!confirm('确定删除？')) return;
   await api(`/api/point-items/${id}`, { method: 'DELETE' });
+  loadItems();
+}
+
+async function moveItem(id, direction) {
+  await api(`/api/point-items/${id}/move`, { method: 'POST', body: { direction } });
   loadItems();
 }
 

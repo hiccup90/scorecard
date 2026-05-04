@@ -173,6 +173,26 @@ app.delete('/api/point-items/:id', auth, (req, res) => {
   res.json({ ok: true });
 });
 
+// 移动打卡项排序（上移/下移）
+app.post('/api/point-items/:id/move', auth, (req, res) => {
+  const { direction } = req.body; // 'up' or 'down'
+  const item = db.prepare('SELECT id, sort_order FROM point_items WHERE id = ?').get(req.params.id);
+  if (!item) return res.status(404).json({ error: '不存在' });
+
+  const neighbor = direction === 'up'
+    ? db.prepare('SELECT id, sort_order FROM point_items WHERE sort_order < ? ORDER BY sort_order DESC LIMIT 1').get(item.sort_order)
+    : db.prepare('SELECT id, sort_order FROM point_items WHERE sort_order > ? ORDER BY sort_order ASC LIMIT 1').get(item.sort_order);
+
+  if (!neighbor) return res.json({ ok: true, moved: false });
+
+  db.transaction(() => {
+    db.prepare('UPDATE point_items SET sort_order = ? WHERE id = ?').run(neighbor.sort_order, item.id);
+    db.prepare('UPDATE point_items SET sort_order = ? WHERE id = ?').run(item.sort_order, neighbor.id);
+  })();
+
+  res.json({ ok: true, moved: true });
+});
+
 // ─── 打卡（即时满足 + 事后审核） ──────────────────────────────────
 app.post('/api/clock', (req, res) => {
   const { user_id, item_id } = req.body;
