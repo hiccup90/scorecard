@@ -105,6 +105,8 @@
       font-size: 16px; font-weight: 700; margin-bottom: 12px; margin-top: 4px;
     }
     .review-section-title:not(:first-child) { margin-top: 28px; }
+    .cat-section { margin-bottom: 20px; }
+    .cat-section-header { font-size: 14px; font-weight: 700; color: var(--primary); margin: 16px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; }
 
     /* 驳回原因 */
     .reject-reason {
@@ -505,21 +507,37 @@ async function loadItems() {
     list.innerHTML = '<div class="empty"><div class="icon">⭐</div><div>还没有打卡项</div></div>';
     return;
   }
-  list.innerHTML = items.map(item => `
-    <div class="card">
-      <div class="card-row">
-        <div class="card-icon">${item.icon || '⭐'}</div>
-        <div class="card-body">
-          <div class="card-title">${item.label} <span class="cat-badge">${item.category || '其他'}</span></div>
-          <div class="card-meta">${item.points} 分 · ${item.enabled ? '启用' : '禁用'}</div>
+  // 按分类分组
+  const groups = {};
+  items.forEach(item => {
+    const cat = item.category || '生活';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(item);
+  });
+  const catOrder = ['语文','数学','英语','科学','生活','才艺'];
+  const sortedCats = catOrder.filter(c => groups[c]);
+  Object.keys(groups).forEach(c => { if (!sortedCats.includes(c)) sortedCats.push(c); });
+
+  list.innerHTML = sortedCats.map(cat => `
+    <div class="cat-section">
+      <div class="cat-section-header">${cat}</div>
+      ${groups[cat].map(item => `
+        <div class="card">
+          <div class="card-row">
+            <div class="card-icon">${item.icon || '⭐'}</div>
+            <div class="card-body">
+              <div class="card-title">${item.label}</div>
+              <div class="card-meta">${item.points} 分 · ${item.enabled ? '启用' : '禁用'}</div>
+            </div>
+            <div class="card-action" style="flex-wrap:wrap;gap:4px;">
+              <button class="btn" style="background:var(--border);font-size:11px;padding:4px 8px;" onclick="moveItem(${item.id},'up')">↑</button>
+              <button class="btn" style="background:var(--border);font-size:11px;padding:4px 8px;" onclick="moveItem(${item.id},'down')">↓</button>
+              <button class="btn" style="background:var(--border);font-size:12px;" onclick="editItem(${item.id}, '${item.label.replace(/'/g, "\\'")}', ${item.points}, '${item.icon}', '${item.color}', '${item.category || '生活'}')">编辑</button>
+              <button class="btn btn-red" style="font-size:12px;" onclick="deleteItem(${item.id})">删除</button>
+            </div>
+          </div>
         </div>
-        <div class="card-action" style="flex-wrap:wrap;gap:4px;">
-          <button class="btn" style="background:var(--border);font-size:11px;padding:4px 8px;" onclick="moveItem(${item.id},'up')">↑</button>
-          <button class="btn" style="background:var(--border);font-size:11px;padding:4px 8px;" onclick="moveItem(${item.id},'down')">↓</button>
-          <button class="btn" style="background:var(--border);font-size:12px;" onclick="editItem(${item.id}, '${item.label.replace(/'/g, "\\'")}', ${item.points}, '${item.icon}', '${item.color}', '${item.category || '其他'}')">编辑</button>
-          <button class="btn btn-red" style="font-size:12px;" onclick="deleteItem(${item.id})">删除</button>
-        </div>
-      </div>
+      `).join('')}
     </div>
   `).join('');
 }

@@ -173,23 +173,22 @@ app.delete('/api/point-items/:id', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-// 移动打卡项排序（上移/下移）— 按位置交换后重排序号
+// 移动打卡项排序（上移/下移）— 同分类内交换后重排序号
 app.post('/api/point-items/:id/move', auth, (req, res) => {
   const { direction } = req.body;
-  const all = db.prepare('SELECT id FROM point_items ORDER BY sort_order, id').all();
-  const idx = all.findIndex(r => r.id == req.params.id);
-  if (idx < 0) return res.status(404).json({ error: '不存在' });
+  const item = db.prepare('SELECT id, category FROM point_items WHERE id = ?').get(req.params.id);
+  if (!item) return res.status(404).json({ error: '不存在' });
 
+  const catItems = db.prepare('SELECT id FROM point_items WHERE category = ? ORDER BY sort_order, id').all(item.category);
+  const idx = catItems.findIndex(r => r.id == req.params.id);
   const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-  if (swapIdx < 0 || swapIdx >= all.length) return res.json({ ok: true, moved: false });
+  if (swapIdx < 0 || swapIdx >= catItems.length) return res.json({ ok: true, moved: false });
 
-  // swap positions in array
-  [all[idx], all[swapIdx]] = [all[swapIdx], all[idx]];
+  [catItems[idx], catItems[swapIdx]] = [catItems[swapIdx], catItems[idx]];
 
-  // reindex sequentially
   db.transaction(() => {
     const upd = db.prepare('UPDATE point_items SET sort_order = ? WHERE id = ?');
-    all.forEach((r, i) => upd.run(i, r.id));
+    catItems.forEach((r, i) => upd.run(i, r.id));
   })();
 
   res.json({ ok: true, moved: true });
