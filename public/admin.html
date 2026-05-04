@@ -155,7 +155,11 @@
     }
     .login-box input:focus { outline: none; border-color: var(--primary); }
     .login-error { color: var(--red); font-size: 13px; margin-bottom: 12px; min-height: 20px; }
-  </style>
+  /* icon picker */
+.icon-opt { width:36px; height:36px; font-size:20px; display:flex; align-items:center; justify-content:center; border:2px solid transparent; border-radius:8px; cursor:pointer; transition:all .15s; background:var(--input-bg); }
+.icon-opt:hover { border-color:var(--primary); transform:scale(1.15); }
+.icon-opt.active { border-color:var(--primary); background:rgba(102,126,234,.15); }
+</style>
 </head>
 <body>
   <!-- PIN 登录 -->
@@ -287,9 +291,10 @@
           <label>积分</label>
           <input type="number" id="itemPoints" placeholder="5">
         </div>
-        <div class="form-group">
+        <div class="form-group full">
           <label>图标</label>
-          <input type="text" id="itemIcon" placeholder="📚">
+          <div id="iconPicker" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
+          <input type="hidden" id="itemIcon">
         </div>
         <div class="form-group">
           <label>分类</label>
@@ -300,13 +305,9 @@
             <option value="科学">科学</option>
             <option value="生活">生活</option>
             <option value="才艺">才艺</option>
-            <option value="其他">其他</option>
           </select>
         </div>
-        <div class="form-group">
-          <label>颜色</label>
-          <input type="color" id="itemColor" value="#6C63FF" style="height:40px;padding:2px;">
-        </div>
+        
       </div>
       <div class="modal-actions">
         <button class="btn btn-cancel" onclick="closeItemModal()">取消</button>
@@ -523,14 +524,29 @@ async function loadItems() {
   `).join('');
 }
 
+const ICONS = ['📚','📖','✏️','🖊️','📝','🧮','🔢','🅰️','🔤','🧪','🔬','🔭','🌍','🗺️','🎵','🎹','🎸','🎨','🖌️','💃','⚽','🏀','🏃','🏊','🧘','🍳','🧹','🧺','🌱','💧','🍎','🥛','😴','⏰','💡','🧩','🎯','⭐','✨','🏆','🎁','❤️','👍','💪'];
+
+function initIconPicker(selected) {
+  const el = document.getElementById('iconPicker');
+  el.innerHTML = ICONS.map(ic =>
+    `<div class="icon-opt${ic===selected?' active':''}" data-ic="${ic}" onclick="pickIcon(this,'${ic}')">${ic}</div>`
+  ).join('');
+}
+
+function pickIcon(el, ic) {
+  document.querySelectorAll('#iconPicker .icon-opt').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('itemIcon').value = ic;
+}
+
 function openItemModal() {
   document.getElementById('itemId').value = '';
   document.getElementById('itemLabel').value = '';
   document.getElementById('itemPoints').value = '';
   document.getElementById('itemIcon').value = '✨';
-  document.getElementById('itemColor').value = '#6C63FF';
-  document.getElementById('itemCategory').value = '其他';
+  document.getElementById('itemCategory').value = '生活';
   document.getElementById('itemModalTitle').textContent = '新增打卡项';
+  initIconPicker('✨');
   document.getElementById('itemModal').classList.add('show');
 }
 
@@ -539,9 +555,9 @@ function editItem(id, label, points, icon, color, category) {
   document.getElementById('itemLabel').value = label;
   document.getElementById('itemPoints').value = points;
   document.getElementById('itemIcon').value = icon;
-  document.getElementById('itemColor').value = color;
-  document.getElementById('itemCategory').value = category || '其他';
+  document.getElementById('itemCategory').value = category || '生活';
   document.getElementById('itemModalTitle').textContent = '编辑打卡项';
+  initIconPicker(icon);
   document.getElementById('itemModal').classList.add('show');
 }
 
@@ -554,8 +570,8 @@ async function saveItem() {
   const body = {
     label: document.getElementById('itemLabel').value,
     points: parseInt(document.getElementById('itemPoints').value),
-    icon: document.getElementById('itemIcon').value,
-    color: document.getElementById('itemColor').value,
+    icon: document.getElementById('itemIcon').value || '✨',
+    color: '#6C63FF',
     category: document.getElementById('itemCategory').value,
     enabled: true,
     sort_order: 0,

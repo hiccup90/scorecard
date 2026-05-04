@@ -156,7 +156,7 @@ app.post('/api/point-items', auth, (req, res) => {
   const max = db.prepare('SELECT MAX(sort_order) as m FROM point_items').get();
   const result = db.prepare(
     'INSERT INTO point_items (label, points, icon, color, category, sort_order) VALUES (?,?,?,?,?,?)'
-  ).run(label, points, icon || '✨', color || '#6C63FF', category || '其他', (max?.m ?? 0) + 1);
+  ).run(label, points, icon || '✨', color || '#6C63FF', category || '生活', (max?.m ?? 0) + 1);
   res.json({ id: result.lastInsertRowid });
 });
 
@@ -164,7 +164,7 @@ app.put('/api/point-items/:id', auth, (req, res) => {
   const { label, points, icon, color, category, enabled, sort_order } = req.body;
   db.prepare(
     'UPDATE point_items SET label=?, points=?, icon=?, color=?, category=?, enabled=?, sort_order=? WHERE id=?'
-  ).run(label, points, icon, color, category || '其他', enabled ? 1 : 0, sort_order, req.params.id);
+  ).run(label, points, icon, color, category || '生活', enabled ? 1 : 0, sort_order, req.params.id);
   res.json({ ok: true });
 });
 
@@ -173,21 +173,23 @@ app.delete('/api/point-items/:id', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-// 移动打卡项排序（上移/下移）
+// 移动打卡项排序（上移/下移）— 按位置交换后重排序号
 app.post('/api/point-items/:id/move', auth, (req, res) => {
-  const { direction } = req.body; // 'up' or 'down'
-  const item = db.prepare('SELECT id, sort_order FROM point_items WHERE id = ?').get(req.params.id);
-  if (!item) return res.status(404).json({ error: '不存在' });
+  const { direction } = req.body;
+  const all = db.prepare('SELECT id FROM point_items ORDER BY sort_order, id').all();
+  const idx = all.findIndex(r => r.id == req.params.id);
+  if (idx < 0) return res.status(404).json({ error: '不存在' });
 
-  const neighbor = direction === 'up'
-    ? db.prepare('SELECT id, sort_order FROM point_items WHERE sort_order < ? ORDER BY sort_order DESC LIMIT 1').get(item.sort_order)
-    : db.prepare('SELECT id, sort_order FROM point_items WHERE sort_order > ? ORDER BY sort_order ASC LIMIT 1').get(item.sort_order);
+  const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= all.length) return res.json({ ok: true, moved: false });
 
-  if (!neighbor) return res.json({ ok: true, moved: false });
+  // swap positions in array
+  [all[idx], all[swapIdx]] = [all[swapIdx], all[idx]];
 
+  // reindex sequentially
   db.transaction(() => {
-    db.prepare('UPDATE point_items SET sort_order = ? WHERE id = ?').run(neighbor.sort_order, item.id);
-    db.prepare('UPDATE point_items SET sort_order = ? WHERE id = ?').run(item.sort_order, neighbor.id);
+    const upd = db.prepare('UPDATE point_items SET sort_order = ? WHERE id = ?');
+    all.forEach((r, i) => upd.run(i, r.id));
   })();
 
   res.json({ ok: true, moved: true });

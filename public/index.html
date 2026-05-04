@@ -409,21 +409,22 @@
       const tabsEl = document.getElementById('categoryTabs');
       if (categories.length > 1) {
         tabsEl.style.display = 'flex';
-        tabsEl.innerHTML = `<div class="cat-tab active" data-cat="all">全部</div>` +
-          categories.map(c => `<div class="cat-tab" data-cat="${c}">${c}</div>`).join('');
+        tabsEl.innerHTML = categories.map((c, i) =>
+          `<div class="cat-tab${i===0?' active':''}" data-cat="${c}">${c}</div>`
+        ).join('');
+        activeCategory = categories[0] || null;
         tabsEl.querySelectorAll('.cat-tab').forEach(t => {
           t.addEventListener('click', () => {
             tabsEl.querySelectorAll('.cat-tab').forEach(x => x.classList.remove('active'));
             t.classList.add('active');
-            activeCategory = t.dataset.cat === 'all' ? null : t.dataset.cat;
+            activeCategory = t.dataset.cat;
             renderButtons();
           });
         });
       } else {
         tabsEl.style.display = 'none';
+        activeCategory = null;
       }
-
-      activeCategory = null;
 
       // 从 clock_requests 判断今日已打卡（替代从 point_log 判断）
       await loadClockRequests();

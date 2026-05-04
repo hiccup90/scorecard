@@ -24,7 +24,7 @@ db.exec(`
     points     INTEGER NOT NULL DEFAULT 0,
     icon       TEXT    DEFAULT '✨',
     color      TEXT    DEFAULT '#6C63FF',
-    category   TEXT    DEFAULT '其他',
+    category   TEXT    DEFAULT '生活',
     sort_order INTEGER DEFAULT 0,
     enabled    INTEGER DEFAULT 1
   );
@@ -94,7 +94,7 @@ function addColumnIfNotExists(table, column, type) {
   }
 }
 
-try { addColumnIfNotExists('point_items', 'category', "TEXT DEFAULT '其他'"); } catch {}
+try { addColumnIfNotExists('point_items', 'category', "TEXT DEFAULT '生活'"); } catch {}
 try { addColumnIfNotExists('clock_requests', 'streak_bonus', 'INTEGER DEFAULT 0'); } catch {}
 try { addColumnIfNotExists('clock_requests', 'auto_approved', 'INTEGER DEFAULT 0'); } catch {}
 try { addColumnIfNotExists('clock_requests', 'expires_at', 'DATETIME'); } catch {}
@@ -143,7 +143,7 @@ if (itemCount.c === 0) {
   for (const row of defaults) insert.run(...row);
 } else {
   // 给旧数据补 category（如果没有分类的记录）
-  const noCat = db.prepare("SELECT id FROM point_items WHERE category IS NULL OR category = '其他'").all();
+  const noCat = db.prepare("SELECT id FROM point_items WHERE category IS NULL OR category = '其他' OR category = ''").all();
   if (noCat.length > 0) {
     const mapping = {
       '写作业': '语文', '阅读': '语文',
