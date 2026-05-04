@@ -193,9 +193,8 @@
       text-align: center; font-size: 15px; font-weight: 700;
       margin-bottom: 10px; opacity: 0.9;
     }
-    .cal-header { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-bottom: 3px; }
-    .cal-day-header { text-align: center; font-size: 11px; opacity: 0.6; padding: 4px 0; }
     .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .cal-day-header { text-align: center; font-size: 11px; opacity: 0.6; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
     .cal-cell {
       aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
       border-radius: 6px; font-size: 12px; font-weight: 600;
@@ -208,9 +207,49 @@
       font-size: 10px; opacity: 0.6; justify-content: flex-end;
     }
     .cal-legend-swatch { width: 13px; height: 13px; border-radius: 3px; }
+
+    /* 首次验证遮罩 */
+    .verify-overlay {
+      position: fixed; inset: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      z-index: 200; display: flex; align-items: center; justify-content: center;
+    }
+    .verify-overlay.hidden { display: none; }
+    .verify-box {
+      background: rgba(255,255,255,0.15); backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.25); border-radius: 20px;
+      padding: 32px 28px; width: 100%; max-width: 320px; text-align: center;
+      color: #fff;
+    }
+    .verify-box h2 { font-size: 20px; margin-bottom: 8px; }
+    .verify-box p { font-size: 13px; opacity: 0.8; margin-bottom: 20px; }
+    .verify-box input {
+      background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 12px; color: #fff; padding: 12px 16px; font-size: 24px;
+      text-align: center; letter-spacing: 12px; width: 100%; margin-bottom: 16px;
+    }
+    .verify-box input::placeholder { color: rgba(255,255,255,0.4); letter-spacing: 4px; font-size: 16px; }
+    .verify-box input:focus { outline: none; border-color: rgba(255,255,255,0.6); }
+    .verify-error { color: #ff6b6b; font-size: 13px; margin-bottom: 12px; min-height: 20px; }
+    .verify-btn {
+      background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 12px; color: #fff; padding: 12px; width: 100%; font-size: 15px;
+      font-weight: 700; cursor: pointer; transition: all 0.2s;
+    }
+    .verify-btn:active { transform: scale(0.97); background: rgba(255,255,255,0.35); }
   </style>
 </head>
 <body>
+  <!-- 首次验证 -->
+  <div class="verify-overlay" id="verifyOverlay">
+    <div class="verify-box">
+      <h2>👋 欢迎打卡</h2>
+      <p>请输入 PIN 码激活</p>
+      <input type="password" id="verifyPin" inputmode="numeric" maxlength="8" placeholder="····">
+      <div class="verify-error" id="verifyError"></div>
+      <button class="verify-btn" onclick="doVerify()">开始打卡</button>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <div class="container">
@@ -681,11 +720,10 @@
       }
 
       let html = `<div class="cal-month-title">${year}年${month + 1}月</div>`;
-      html += '<div class="cal-header">';
+      html += '<div class="cal-grid">';
       ['日', '一', '二', '三', '四', '五', '六'].forEach(d => {
         html += `<div class="cal-day-header">${d}</div>`;
       });
-      html += '</div><div class="cal-grid">';
 
       // 月初空白格
       for (let i = 0; i < startDay; i++) {
@@ -789,9 +827,49 @@
       }
     }
 
+    // ── 首次验证 ──
+    const VERIFIED_KEY = 'scorecard-child-verified';
+
+    function showVerify() {
+      document.getElementById('verifyOverlay').classList.remove('hidden');
+      document.getElementById('verifyPin').focus();
+    }
+
+    async function doVerify() {
+      const pin = document.getElementById('verifyPin').value.trim();
+      if (!pin) return;
+      try {
+        const res = await fetch(API + '/api/auth/verify-child', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          localStorage.setItem(VERIFIED_KEY, '1');
+          document.getElementById('verifyOverlay').classList.add('hidden');
+          loadHome();
+          setInterval(pollRefresh, 30000);
+        } else {
+          document.getElementById('verifyError').textContent = data.error || 'PIN 码错误';
+        }
+      } catch (e) {
+        document.getElementById('verifyError').textContent = '网络错误';
+      }
+    }
+
+    document.getElementById('verifyPin').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doVerify();
+    });
+
     // ── 启动 ──
-    loadHome();
-    setInterval(pollRefresh, 30000);
+    if (localStorage.getItem(VERIFIED_KEY)) {
+      document.getElementById('verifyOverlay').classList.add('hidden');
+      loadHome();
+      setInterval(pollRefresh, 30000);
+    } else {
+      showVerify();
+    }
   </script>
 </body>
 </html>

@@ -8,4 +8,6 @@ services:
       - ./data:/app/data
     environment:
       - PORT=3003
+      - ADMIN_PIN=${ADMIN_PIN:-1234}
+      - CHILD_PIN=${CHILD_PIN:-${ADMIN_PIN:-1234}}
     restart: unless-stopped

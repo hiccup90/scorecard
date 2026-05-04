@@ -9,6 +9,46 @@ const app = express();
 app.use(express.json());
 app.use(express.static(join(__dirname, '../public')));
 
+// ─── 认证 ─────────────────────────────────────────────────────────
+const ADMIN_PIN = process.env.ADMIN_PIN || '1234';
+const CHILD_PIN = process.env.CHILD_PIN || ADMIN_PIN; // 默认同管理员 PIN
+const authTokens = new Map(); // token -> expiresAt
+const TOKEN_TTL = 24 * 60 * 60 * 1000; // 24h
+
+function auth(req, res, next) {
+  const token = req.headers['x-auth-token'];
+  if (!token || !authTokens.has(token) || Date.now() > authTokens.get(token)) {
+    authTokens.delete(token);
+    return res.status(401).json({ error: '需要登录' });
+  }
+  next();
+}
+
+// 每小时清理过期 token
+setInterval(() => {
+  const now = Date.now();
+  for (const [t, exp] of authTokens) { if (now > exp) authTokens.delete(t); }
+}, 3600000);
+
+app.post('/api/auth/login', (req, res) => {
+  const { pin } = req.body;
+  if (pin !== ADMIN_PIN) return res.status(403).json({ error: 'PIN 码错误' });
+  const token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  authTokens.set(token, Date.now() + TOKEN_TTL);
+  res.json({ ok: true, token });
+});
+
+app.post('/api/auth/verify', auth, (req, res) => {
+  res.json({ ok: true });
+});
+
+// 孩子端一次性验证（不签 token，只校验 PIN）
+app.post('/api/auth/verify-child', (req, res) => {
+  const { pin } = req.body;
+  if (pin !== CHILD_PIN) return res.status(403).json({ error: 'PIN 码错误' });
+  res.json({ ok: true });
+});
+
 // ─── 工具 ───────────────────────────────────────────────────────────
 const getBalance = (userId) => {
   const row = db.prepare(
@@ -111,7 +151,7 @@ app.get('/api/categories', (req, res) => {
   res.json(cats.map(c => c.category));
 });
 
-app.post('/api/point-items', (req, res) => {
+app.post('/api/point-items', auth, (req, res) => {
   const { label, points, icon, color, category } = req.body;
   const max = db.prepare('SELECT MAX(sort_order) as m FROM point_items').get();
   const result = db.prepare(
@@ -120,7 +160,7 @@ app.post('/api/point-items', (req, res) => {
   res.json({ id: result.lastInsertRowid });
 });
 
-app.put('/api/point-items/:id', (req, res) => {
+app.put('/api/point-items/:id', auth, (req, res) => {
   const { label, points, icon, color, category, enabled, sort_order } = req.body;
   db.prepare(
     'UPDATE point_items SET label=?, points=?, icon=?, color=?, category=?, enabled=?, sort_order=? WHERE id=?'
@@ -128,7 +168,7 @@ app.put('/api/point-items/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-app.delete('/api/point-items/:id', (req, res) => {
+app.delete('/api/point-items/:id', auth, (req, res) => {
   db.prepare('DELETE FROM point_items WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
@@ -181,7 +221,7 @@ app.post('/api/clock', (req, res) => {
 });
 
 // ─── 打卡记录（家长端） ──────────────────────────────────────────
-app.get('/api/clock-requests', (req, res) => {
+app.get('/api/clock-requests', auth, (req, res) => {
   const rows = db.prepare(`
     SELECT cr.*, u.name as user_name, pi.label as item_label, pi.icon, pi.color, pi.category
     FROM clock_requests cr
@@ -193,7 +233,7 @@ app.get('/api/clock-requests', (req, res) => {
 });
 
 // 家长撤回打卡（24h 内可撤回）
-app.post('/api/clock-requests/:id/reverse', (req, res) => {
+app.post('/api/clock-requests/:id/reverse', auth, (req, res) => {
   const row = db.prepare('SELECT * FROM clock_requests WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: '不存在' });
   if (row.status === 'reversed') return res.status(400).json({ error: '已经撤回过了' });
@@ -220,7 +260,7 @@ app.post('/api/clock-requests/:id/reverse', (req, res) => {
 });
 
 // 家长通过打卡审核
-app.post('/api/clock-requests/:id/approve', (req, res) => {
+app.post('/api/clock-requests/:id/approve', auth, (req, res) => {
   const row = db.prepare('SELECT * FROM clock_requests WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: '不存在' });
   if (row.status === 'confirmed') return res.status(400).json({ error: '已通过' });
@@ -234,7 +274,7 @@ app.post('/api/clock-requests/:id/approve', (req, res) => {
 });
 
 // 家长驳回打卡（撤回积分）— 仅限 pending 状态
-app.post('/api/clock-requests/:id/reject', (req, res) => {
+app.post('/api/clock-requests/:id/reject', auth, (req, res) => {
   const row = db.prepare('SELECT * FROM clock_requests WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: '不存在' });
   if (row.status !== 'pending') return res.status(400).json({ error: '只能驳回待审核的打卡' });
@@ -259,7 +299,7 @@ app.post('/api/clock-requests/:id/reject', (req, res) => {
 });
 
 // 批量通过打卡审核
-app.post('/api/clock-requests/approve-all', (req, res) => {
+app.post('/api/clock-requests/approve-all', auth, (req, res) => {
   const { parent_id } = req.body;
   const pending = db.prepare(
     "SELECT * FROM clock_requests WHERE status = 'pending' AND user_id = 1"
@@ -275,7 +315,7 @@ app.post('/api/clock-requests/approve-all', (req, res) => {
 });
 
 // ─── 手工调分 ──────────────────────────────────────────────────────
-app.post('/api/adjust', (req, res) => {
+app.post('/api/adjust', auth, (req, res) => {
   const { user_id, change, reason, parent_id } = req.body;
   if (!user_id || change === undefined) {
     return res.status(400).json({ error: '缺少参数' });
@@ -320,7 +360,7 @@ app.get('/api/rewards', (req, res) => {
   res.json(rewards);
 });
 
-app.post('/api/rewards', (req, res) => {
+app.post('/api/rewards', auth, (req, res) => {
   const { name, cost, description, stock, auto_approve } = req.body;
   const result = db.prepare(
     'INSERT INTO rewards (name, cost, description, stock, auto_approve) VALUES (?,?,?,?,?)'
@@ -328,7 +368,7 @@ app.post('/api/rewards', (req, res) => {
   res.json({ id: result.lastInsertRowid });
 });
 
-app.put('/api/rewards/:id', (req, res) => {
+app.put('/api/rewards/:id', auth, (req, res) => {
   const { name, cost, description, stock, auto_approve, enabled } = req.body;
   db.prepare(
     'UPDATE rewards SET name=?, cost=?, description=?, stock=?, auto_approve=?, enabled=? WHERE id=?'
@@ -336,7 +376,7 @@ app.put('/api/rewards/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-app.delete('/api/rewards/:id', (req, res) => {
+app.delete('/api/rewards/:id', auth, (req, res) => {
   db.prepare('DELETE FROM rewards WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
@@ -381,7 +421,7 @@ app.post('/api/redeem', (req, res) => {
 });
 
 // ─── 审批兑换 ──────────────────────────────────────────────────────
-app.get('/api/redemptions', (req, res) => {
+app.get('/api/redemptions', auth, (req, res) => {
   const rows = db.prepare(`
     SELECT rr.*, r.name as reward_name, u.name as user_name
     FROM redemption_requests rr
@@ -392,7 +432,7 @@ app.get('/api/redemptions', (req, res) => {
   res.json(rows);
 });
 
-app.post('/api/redemptions/:id/approve', (req, res) => {
+app.post('/api/redemptions/:id/approve', auth, (req, res) => {
   const row = db.prepare('SELECT * FROM redemption_requests WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: '不存在' });
   if (row.status !== 'pending') return res.status(400).json({ error: '状态不对' });
@@ -421,7 +461,7 @@ app.post('/api/redemptions/:id/approve', (req, res) => {
   res.json({ ok: true, new_balance: getBalance(row.user_id) });
 });
 
-app.post('/api/redemptions/:id/reject', (req, res) => {
+app.post('/api/redemptions/:id/reject', auth, (req, res) => {
   db.prepare(
     'UPDATE redemption_requests SET status=? WHERE id=?'
   ).run('rejected', req.params.id);
@@ -429,11 +469,11 @@ app.post('/api/redemptions/:id/reject', (req, res) => {
 });
 
 // ─── 用户 ──────────────────────────────────────────────────────────
-app.get('/api/users', (req, res) => {
+app.get('/api/users', auth, (req, res) => {
   res.json(db.prepare('SELECT * FROM users').all());
 });
 
-app.post('/api/users', (req, res) => {
+app.post('/api/users', auth, (req, res) => {
   const { name, role, password } = req.body;
   const result = db.prepare(
     'INSERT INTO users (name, role, password) VALUES (?,?,?)'

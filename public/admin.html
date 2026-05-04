@@ -135,9 +135,40 @@
       .reward-card .r-name { font-size: 14px; }
       .btn-full { padding: 10px 14px; font-size: 13px; }
     }
+
+    /* 登录遮罩 */
+    .login-overlay {
+      position: fixed; inset: 0; background: var(--bg); z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .login-overlay.hidden { display: none; }
+    .login-box {
+      background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+      padding: 32px 28px; width: 100%; max-width: 340px; text-align: center;
+    }
+    .login-box h2 { font-size: 20px; margin-bottom: 8px; }
+    .login-box p { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+    .login-box input {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+      color: var(--text); padding: 12px 16px; font-size: 24px; text-align: center;
+      letter-spacing: 12px; width: 100%; margin-bottom: 16px;
+    }
+    .login-box input:focus { outline: none; border-color: var(--primary); }
+    .login-error { color: var(--red); font-size: 13px; margin-bottom: 12px; min-height: 20px; }
   </style>
 </head>
 <body>
+  <!-- PIN 登录 -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-box">
+      <h2>🔐 家长验证</h2>
+      <p>请输入管理 PIN 码</p>
+      <input type="password" id="pinInput" inputmode="numeric" maxlength="8" placeholder="····" autofocus>
+      <div class="login-error" id="loginError"></div>
+      <button class="btn btn-primary" style="width:100%;padding:12px;" onclick="doLogin()">进入管理</button>
+    </div>
+  </div>
+
   <div class="wrap">
     <div class="topbar">
       <h1>🛡️ 家长管理</h1>
@@ -345,15 +376,74 @@ const PARENT_ID = 2;
   });
 })();
 
-// ── API ──
+// ── API（带认证） ──
+let authToken = sessionStorage.getItem('scorecard-token') || '';
+
 async function api(path, opts = {}) {
   const res = await fetch(API + path, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(authToken ? { 'x-auth-token': authToken } : {}),
+    },
     ...opts,
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
+  if (res.status === 401) {
+    authToken = '';
+    sessionStorage.removeItem('scorecard-token');
+    showLogin();
+    throw new Error('需要登录');
+  }
   return res.json();
 }
+
+// ── 登录 ──
+function showLogin() {
+  document.getElementById('loginOverlay').classList.remove('hidden');
+  document.getElementById('pinInput').value = '';
+  document.getElementById('loginError').textContent = '';
+  document.getElementById('pinInput').focus();
+}
+
+async function doLogin() {
+  const pin = document.getElementById('pinInput').value.trim();
+  if (!pin) return;
+  try {
+    const res = await fetch(API + '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin }),
+    });
+    const data = await res.json();
+    if (data.ok && data.token) {
+      authToken = data.token;
+      sessionStorage.setItem('scorecard-token', authToken);
+      document.getElementById('loginOverlay').classList.add('hidden');
+      loadOverview(); loadLogs(); loadItems(); loadRewards();
+    } else {
+      document.getElementById('loginError').textContent = data.error || 'PIN 码错误';
+    }
+  } catch (e) {
+    document.getElementById('loginError').textContent = '网络错误';
+  }
+}
+
+// PIN 输入框回车提交
+document.getElementById('pinInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+// ── 启动：先验证 token ──
+(async function init() {
+  if (!authToken) { showLogin(); return; }
+  try {
+    const res = await fetch(API + '/api/auth/verify', {
+      headers: { 'x-auth-token': authToken },
+    });
+    if (!res.ok) { showLogin(); return; }
+  } catch { showLogin(); return; }
+  loadOverview(); loadLogs(); loadItems(); loadRewards();
+})();
 
 // ── Tab 切换 ──
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -756,13 +846,7 @@ async function rejectRedemption(id) {
   loadPendingRedemptions();
 }
 
-// ── 初始化 ──
-loadOverview();
-loadLogs();
-loadItems();
-loadRewards();
-
-// 每 30 秒刷新概览卡片
+// ── 自动刷新 ──
 setInterval(loadOverview, 30000);
 </script>
 </body>
