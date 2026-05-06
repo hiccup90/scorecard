@@ -202,10 +202,10 @@
 
     <!-- 标签页 -->
     <div class="tabs">
-      <button class="tab-btn active" data-tab="tab-log">积分记录</button>
-      <button class="tab-btn" data-tab="tab-items">打卡项</button>
+      <button class="tab-btn active" data-tab="tab-review">审核</button>
       <button class="tab-btn" data-tab="tab-rewards">奖励</button>
-      <button class="tab-btn" data-tab="tab-review">审核</button>
+      <button class="tab-btn" data-tab="tab-items">打卡项</button>
+      <button class="tab-btn" data-tab="tab-log">积分记录</button>
       <button class="tab-btn" data-tab="tab-adjust">调分</button>
     </div>
 
@@ -240,11 +240,6 @@
 
     <!-- 审核 -->
     <div class="tab-content" id="tab-review">
-      <!-- 一键通过 -->
-      <button class="btn btn-green btn-full" id="approveAllBtn" onclick="approveAllClocks()" style="display:none;">
-        ✅ 一键通过全部 (<span id="pendingCount">0</span>条)
-      </button>
-
       <!-- 打卡审核区 -->
       <div class="review-section-title">📝 打卡审核</div>
       <div id="clockReviewList"></div>
@@ -290,15 +285,23 @@
           <input type="text" id="itemLabel" placeholder="如：写作业">
         </div>
         <div class="form-group">
-          <label>积分</label>
-          <input type="number" id="itemPoints" placeholder="5">
+          <label>基础分</label>
+          <input type="number" id="itemPoints" placeholder="1">
+        </div>
+        <div class="form-group">
+          <label>类型</label>
+          <select id="itemScoreMode">
+            <option value="default">默认</option>
+            <option value="quality">质量</option>
+            <option value="duration">时长</option>
+          </select>
         </div>
         <div class="form-group full">
           <label>图标</label>
           <div id="iconPicker" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
           <input type="hidden" id="itemIcon">
         </div>
-        <div class="form-group">
+        <div class="form-group full">
           <label>分类</label>
           <select id="itemCategory">
             <option value="语文">语文</option>
@@ -308,6 +311,10 @@
             <option value="生活">生活</option>
             <option value="才艺">才艺</option>
           </select>
+        </div>
+        <div class="form-group full">
+          <label>规则说明</label>
+          <input type="text" id="itemRuleHint" value="默认：基础分；质量：及格/良好/优秀=×1/×2/×3；时长：10分钟=1单位" disabled>
         </div>
         
       </div>
@@ -356,9 +363,7 @@
   </div>
 
 <script>
-const API = window.location.pathname.endsWith('.html')
-  ? window.location.pathname.replace(/\/[^/]*$/, '')
-  : window.location.pathname.replace(/\/$/, '');
+const API = '';
 const USER_ID = 1;
 const PARENT_ID = 2;
 
@@ -521,23 +526,29 @@ async function loadItems() {
   list.innerHTML = sortedCats.map(cat => `
     <div class="cat-section">
       <div class="cat-section-header">${cat}</div>
-      ${groups[cat].map(item => `
+      ${groups[cat].map(item => {
+        const modeText = item.score_mode === 'quality'
+          ? '质量'
+          : item.score_mode === 'duration'
+            ? '时长'
+            : '默认';
+        return `
         <div class="card">
           <div class="card-row">
             <div class="card-icon">${item.icon || '⭐'}</div>
             <div class="card-body">
               <div class="card-title">${item.label}</div>
-              <div class="card-meta">${item.points} 分 · ${item.enabled ? '启用' : '禁用'}</div>
+              <div class="card-meta">基础分 ${item.points} · ${modeText} · ${item.enabled ? '启用' : '禁用'}</div>
             </div>
             <div class="card-action" style="flex-wrap:wrap;gap:4px;">
               <button class="btn" style="background:var(--border);font-size:11px;padding:4px 8px;" onclick="moveItem(${item.id},'up')">↑</button>
               <button class="btn" style="background:var(--border);font-size:11px;padding:4px 8px;" onclick="moveItem(${item.id},'down')">↓</button>
-              <button class="btn" style="background:var(--border);font-size:12px;" onclick="editItem(${item.id}, '${item.label.replace(/'/g, "\\'")}', ${item.points}, '${item.icon}', '${item.color}', '${item.category || '生活'}')">编辑</button>
+              <button class="btn" style="background:var(--border);font-size:12px;" onclick="editItem(${item.id}, '${item.label.replace(/'/g, "\\'")}', ${item.points}, '${item.score_mode || 'default'}', '${item.icon}', '${item.color}', '${item.category || '生活'}')">编辑</button>
               <button class="btn btn-red" style="font-size:12px;" onclick="deleteItem(${item.id})">删除</button>
             </div>
           </div>
         </div>
-      `).join('')}
+      `;}).join('')}
     </div>
   `).join('');
 }
@@ -561,6 +572,7 @@ function openItemModal() {
   document.getElementById('itemId').value = '';
   document.getElementById('itemLabel').value = '';
   document.getElementById('itemPoints').value = '';
+  document.getElementById('itemScoreMode').value = 'default';
   document.getElementById('itemIcon').value = '✨';
   document.getElementById('itemCategory').value = '生活';
   document.getElementById('itemModalTitle').textContent = '新增打卡项';
@@ -568,10 +580,11 @@ function openItemModal() {
   document.getElementById('itemModal').classList.add('show');
 }
 
-function editItem(id, label, points, icon, color, category) {
+function editItem(id, label, points, scoreMode, icon, color, category) {
   document.getElementById('itemId').value = id;
   document.getElementById('itemLabel').value = label;
   document.getElementById('itemPoints').value = points;
+  document.getElementById('itemScoreMode').value = scoreMode || 'default';
   document.getElementById('itemIcon').value = icon;
   document.getElementById('itemCategory').value = category || '生活';
   document.getElementById('itemModalTitle').textContent = '编辑打卡项';
@@ -588,6 +601,7 @@ async function saveItem() {
   const body = {
     label: document.getElementById('itemLabel').value,
     points: parseInt(document.getElementById('itemPoints').value),
+    score_mode: document.getElementById('itemScoreMode').value,
     icon: document.getElementById('itemIcon').value || '✨',
     color: '#6C63FF',
     category: document.getElementById('itemCategory').value,
@@ -716,26 +730,14 @@ async function loadClockReview() {
 
   if (!rows.length) {
     list.innerHTML = '<div class="empty"><div class="icon">✅</div><div>暂无打卡记录</div></div>';
-    document.getElementById('approveAllBtn').style.display = 'none';
     return;
   }
 
-  // 排序：pending 在前，然后按时间倒序
   rows.sort((a, b) => {
     const statusOrder = { pending: 0, confirmed: 1, reversed: 2 };
     if (statusOrder[a.status] !== statusOrder[b.status]) return statusOrder[a.status] - statusOrder[b.status];
     return new Date(b.created_at + 'Z') - new Date(a.created_at + 'Z');
   });
-
-  // 统计 pending 数量
-  const pendingCount = rows.filter(r => r.status === 'pending').length;
-  const approveAllBtn = document.getElementById('approveAllBtn');
-  document.getElementById('pendingCount').textContent = pendingCount;
-  if (pendingCount > 0) {
-    approveAllBtn.style.display = 'block';
-  } else {
-    approveAllBtn.style.display = 'none';
-  }
 
   list.innerHTML = rows.map(r => {
     const time = new Date(r.created_at + 'Z').toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
@@ -744,34 +746,60 @@ async function loadClockReview() {
       ? `<span class="streak-badge">🔥连续+${r.streak_bonus}</span>`
       : '';
 
-    // 待审核
     if (r.status === 'pending') {
+      const mode = r.score_mode || 'default';
+      const qualityActions = `
+        <button class="btn btn-green" style="font-size:12px;" onclick="approveClock(${r.id}, 'pass')">及格</button>
+        <button class="btn" style="background:#3B82F6;color:#fff;font-size:12px;" onclick="approveClock(${r.id}, 'good')">良好</button>
+        <button class="btn" style="background:#8B5CF6;color:#fff;font-size:12px;" onclick="approveClock(${r.id}, 'excellent')">优秀</button>
+      `;
+      const defaultActions = `
+        <button class="btn btn-green" style="font-size:12px;" onclick="approveClock(${r.id})">按基础分通过</button>
+      `;
+      const durationActions = `
+        <input type="number" id="minutes-${r.id}" placeholder="分钟" style="width:84px;">
+        <button class="btn btn-green" style="font-size:12px;" onclick="approveDurationClock(${r.id})">按时长通过</button>
+      `;
+      const actionHtml = mode === 'quality' ? qualityActions : mode === 'duration' ? durationActions : defaultActions;
+      const hintText = mode === 'quality'
+        ? `基础分 ${r.base_points} · 及格/良好/优秀 = ×1/×2/×3`
+        : mode === 'duration'
+          ? `基础分 ${r.base_points} · 10分钟=1单位`
+          : `基础分 ${r.base_points}`;
       return `
         <div class="card" style="border-left: 3px solid #FF9800;">
-          <div class="card-row">
+          <div class="card-row" style="align-items:flex-start;">
             <div class="card-icon">${r.icon || '⭐'}</div>
             <div class="card-body">
               <div class="card-title">${r.user_name || '孩子'} 打卡「${r.item_label}」${streakInfo} <span style="color:#FF9800;font-size:12px;">⏳待审核</span></div>
-              <div class="card-meta">+${r.points_at_time} 分 · ${dateStr} ${time}</div>
-            </div>
-            <div class="card-action">
-              <button class="btn btn-green" style="font-size:12px;" onclick="approveClock(${r.id})">通过</button>
-              <button class="btn btn-red" style="font-size:12px;" onclick="rejectClock(${r.id})">驳回</button>
+              <div class="card-meta">${hintText} · ${dateStr} ${time}</div>
+              <div class="card-action" style="margin-top:8px;flex-wrap:wrap;">
+                ${actionHtml}
+                <button class="btn btn-red" style="font-size:12px;" onclick="rejectClock(${r.id})">驳回</button>
+              </div>
             </div>
           </div>
         </div>
       `;
     }
 
-    // 已通过（可撤回）
     if (r.status === 'confirmed') {
+      const detailText = r.review_minutes
+        ? `${r.review_minutes}分钟`
+        : r.review_level === 'excellent'
+          ? '优秀'
+          : r.review_level === 'good'
+            ? '良好'
+            : r.review_level === 'pass'
+              ? '及格'
+              : '默认';
       return `
         <div class="card">
           <div class="card-row">
             <div class="card-icon">${r.icon || '⭐'}</div>
             <div class="card-body">
               <div class="card-title">${r.user_name || '孩子'} 打卡「${r.item_label}」${streakInfo} <span style="color:#4CAF50;font-size:12px;">✓已通过</span></div>
-              <div class="card-meta">+${r.points_at_time} 分 · ${dateStr} ${time}</div>
+              <div class="card-meta">+${r.points_at_time} 分 · ${detailText} · ${dateStr} ${time}</div>
             </div>
             <div class="card-action">
               <button class="btn btn-orange" style="font-size:12px;" onclick="reverseClockRequest(${r.id})">撤回</button>
@@ -781,7 +809,6 @@ async function loadClockReview() {
       `;
     }
 
-    // 已撤回（灰色半透明，显示驳回原因如果有）
     const reasonHtml = r.reverse_reason
       ? `<div class="reject-reason">驳回原因：${r.reverse_reason}</div>`
       : '';
@@ -791,7 +818,7 @@ async function loadClockReview() {
           <div class="card-icon">${r.icon || '⭐'}</div>
           <div class="card-body">
             <div class="card-title">${r.user_name || '孩子'} 打卡「${r.item_label}」${streakInfo} <span style="color:#FF5252;font-size:12px;">❌已撤回</span></div>
-            <div class="card-meta">+${r.points_at_time} 分 · ${dateStr} ${time}</div>
+            <div class="card-meta">${dateStr} ${time}</div>
             ${reasonHtml}
           </div>
         </div>
@@ -800,14 +827,31 @@ async function loadClockReview() {
   }).join('');
 }
 
-async function approveClock(id) {
-  if (!confirm('确认通过？积分已提前发放。')) return;
+async function approveClock(id, reviewLevel = null) {
+  const body = { parent_id: PARENT_ID };
+  if (reviewLevel) body.review_level = reviewLevel;
   await api(`/api/clock-requests/${id}/approve`, {
     method: 'POST',
-    body: { parent_id: PARENT_ID }
+    body
   });
   loadReviewTab();
   loadOverview();
+  loadLogs();
+}
+
+async function approveDurationClock(id) {
+  const minutes = parseInt(document.getElementById(`minutes-${id}`)?.value, 10);
+  if (!minutes || minutes < 10) {
+    alert('请输入至少 10 分钟');
+    return;
+  }
+  await api(`/api/clock-requests/${id}/approve`, {
+    method: 'POST',
+    body: { parent_id: PARENT_ID, review_minutes: minutes }
+  });
+  loadReviewTab();
+  loadOverview();
+  loadLogs();
 }
 
 async function rejectClock(id) {
@@ -828,18 +872,6 @@ async function reverseClockRequest(id) {
   await api(`/api/clock-requests/${id}/reverse`, {
     method: 'POST',
     body: { parent_id: PARENT_ID, reason: reason || '家长撤回' }
-  });
-  loadReviewTab();
-  loadOverview();
-  loadLogs();
-}
-
-async function approveAllClocks() {
-  const count = parseInt(document.getElementById('pendingCount').textContent);
-  if (!confirm(`确认一键通过全部 ${count} 条待审核打卡？`)) return;
-  await api('/api/clock-requests/approve-all', {
-    method: 'POST',
-    body: { parent_id: PARENT_ID }
   });
   loadReviewTab();
   loadOverview();

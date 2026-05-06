@@ -22,6 +22,7 @@ db.exec(`
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     label      TEXT    NOT NULL,
     points     INTEGER NOT NULL DEFAULT 0,
+    score_mode TEXT    NOT NULL DEFAULT 'default',
     icon       TEXT    DEFAULT '✨',
     color      TEXT    DEFAULT '#6C63FF',
     category   TEXT    DEFAULT '生活',
@@ -65,7 +66,10 @@ db.exec(`
     user_id         INTEGER NOT NULL REFERENCES users(id),
     item_id         INTEGER NOT NULL REFERENCES point_items(id),
     points_at_time  INTEGER NOT NULL,
+    awarded_points  INTEGER DEFAULT 0,
     streak_bonus    INTEGER DEFAULT 0,
+    review_level    TEXT,
+    review_minutes  INTEGER,
     status          TEXT    DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'reversed')),
     auto_approved   INTEGER DEFAULT 0,
     expires_at      DATETIME,
@@ -95,7 +99,11 @@ function addColumnIfNotExists(table, column, type) {
 }
 
 try { addColumnIfNotExists('point_items', 'category', "TEXT DEFAULT '生活'"); } catch {}
+try { addColumnIfNotExists('point_items', 'score_mode', "TEXT NOT NULL DEFAULT 'default'"); } catch {}
 try { addColumnIfNotExists('clock_requests', 'streak_bonus', 'INTEGER DEFAULT 0'); } catch {}
+try { addColumnIfNotExists('clock_requests', 'awarded_points', 'INTEGER DEFAULT 0'); } catch {}
+try { addColumnIfNotExists('clock_requests', 'review_level', 'TEXT'); } catch {}
+try { addColumnIfNotExists('clock_requests', 'review_minutes', 'INTEGER'); } catch {}
 try { addColumnIfNotExists('clock_requests', 'auto_approved', 'INTEGER DEFAULT 0'); } catch {}
 try { addColumnIfNotExists('clock_requests', 'expires_at', 'DATETIME'); } catch {}
 try { addColumnIfNotExists('clock_requests', 'confirmed_at', 'DATETIME'); } catch {}
@@ -125,20 +133,20 @@ if (userCount.c === 0) {
 const itemCount = db.prepare('SELECT COUNT(*) as c FROM point_items').get();
 if (itemCount.c === 0) {
   const insert = db.prepare(
-    'INSERT INTO point_items (label, points, icon, color, category, sort_order) VALUES (?,?,?,?,?,?)'
+    'INSERT INTO point_items (label, points, score_mode, icon, color, category, sort_order) VALUES (?,?,?,?,?,?,?)'
   );
   const defaults = [
-    ['写作业', 5, '📚', '#4CAF50', '语文', 1],
-    ['阅读', 3, '📖', '#2196F3', '语文', 2],
-    ['练字', 3, '✍️', '#FF9800', '语文', 3],
-    ['口算', 3, '🔢', '#E91E63', '数学', 4],
-    ['复习', 3, '📝', '#9C27B0', '数学', 5],
-    ['英语朗读', 3, '🗣️', '#00BCD4', '英语', 6],
-    ['背单词', 3, '🔤', '#795548', '英语', 7],
-    ['运动', 3, '🏃', '#FF5722', '生活', 8],
-    ['收书包', 2, '🎒', '#607D8B', '生活', 9],
-    ['家务', 4, '🏠', '#8BC34A', '生活', 10],
-    ['练琴', 5, '🎹', '#CDDC39', '才艺', 11],
+    ['写作业', 2, 'quality', '📚', '#4CAF50', '语文', 1],
+    ['阅读', 1, 'duration', '📖', '#2196F3', '语文', 2],
+    ['练字', 1, 'quality', '✍️', '#FF9800', '语文', 3],
+    ['口算', 1, 'quality', '🔢', '#E91E63', '数学', 4],
+    ['复习', 1, 'quality', '📝', '#9C27B0', '数学', 5],
+    ['英语朗读', 1, 'quality', '🗣️', '#00BCD4', '英语', 6],
+    ['背单词', 1, 'quality', '🔤', '#795548', '英语', 7],
+    ['运动', 1, 'duration', '🏃', '#FF5722', '生活', 8],
+    ['收书包', 2, 'default', '🎒', '#607D8B', '生活', 9],
+    ['家务', 3, 'default', '🏠', '#8BC34A', '生活', 10],
+    ['练琴', 1, 'duration', '🎹', '#CDDC39', '才艺', 11],
   ];
   for (const row of defaults) insert.run(...row);
 } else {
@@ -156,6 +164,27 @@ if (itemCount.c === 0) {
       if (mapping[item.label]) {
         upd.run(mapping[item.label], item.id);
       }
+    }
+  }
+
+  const scoreModeMapping = {
+    '写作业': 'quality',
+    '阅读': 'duration',
+    '练字': 'quality',
+    '口算': 'quality',
+    '复习': 'quality',
+    '英语朗读': 'quality',
+    '背单词': 'quality',
+    '运动': 'duration',
+    '收书包': 'default',
+    '家务': 'default',
+    '练琴': 'duration',
+  };
+  const modeUpd = db.prepare('UPDATE point_items SET score_mode = ? WHERE id = ?');
+  const allItems = db.prepare('SELECT id, label, score_mode FROM point_items').all();
+  for (const item of allItems) {
+    if ((!item.score_mode || item.score_mode === 'default') && scoreModeMapping[item.label]) {
+      modeUpd.run(scoreModeMapping[item.label], item.id);
     }
   }
 }

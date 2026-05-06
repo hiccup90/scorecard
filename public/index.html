@@ -11,6 +11,15 @@
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       min-height: 100vh; color: #fff;
     }
+    .parent-link {
+      position: fixed; top: 14px; right: 14px; z-index: 20;
+      width: 42px; height: 42px; border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.28);
+      background: rgba(255,255,255,0.18); color: #fff;
+      backdrop-filter: blur(14px); display: flex; align-items: center; justify-content: center;
+      text-decoration: none; font-size: 20px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+    }
     .container { max-width: 420px; margin: 0 auto; padding: 20px; }
 
     /* 头部 */
@@ -251,6 +260,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
+  <a class="parent-link" href="/admin" title="家长管理">🛡️</a>
 
   <div class="container">
     <!-- 首页 -->
@@ -302,9 +312,7 @@
   </div>
 
   <script>
-    const API = window.location.pathname.endsWith('.html')
-      ? window.location.pathname.replace(/\/[^/]*$/, '')
-      : window.location.pathname.replace(/\/$/, '');
+    const API = '';
     const USER_ID = 1;
 
     let allItems = [];
@@ -465,13 +473,18 @@
           onClick = `clock(${item.id}, this)`;
         }
 
+        const scoreText = item.score_mode === 'quality'
+          ? `基础分 ${item.points} · 审核给分`
+          : item.score_mode === 'duration'
+            ? `基础分 ${item.points} · 10分钟1单位`
+            : `基础分 ${item.points}`;
         return `
           <div class="btn-item ${cssClass}"
                ${onClick ? `onclick="${onClick}"` : ''}>
             ${streak >= 2 ? `<div class="streak-badge">🔥${streak}</div>` : ''}
             <span class="icon">${item.icon || '✨'}</span>
             <div class="label">${item.label}</div>
-            <div class="points">+${item.points} 分</div>
+            <div class="points">${scoreText}</div>
           </div>
         `;
       }).join('');
@@ -489,31 +502,10 @@
           body: { user_id: USER_ID, item_id: itemId },
         });
         if (res.ok) {
-          // 震动反馈（如果支持）
           if (navigator.vibrate) {
             try { navigator.vibrate(30); } catch (e) { /* ignore */ }
           }
 
-          // 飞分动画
-          const rect = btnEl.getBoundingClientRect();
-          const flyText = res.streak_bonus > 0
-            ? `+${res.points_added} 🔥连${res.streak}天`
-            : `+${res.points_added}`;
-          flyPoints(flyText, rect.left + rect.width / 2 - 30, rect.top);
-
-          // 余额跳动
-          const balEl = document.getElementById('balance');
-          balEl.textContent = res.new_balance;
-          balEl.classList.remove('bump');
-          void balEl.offsetWidth;
-          balEl.classList.add('bump');
-
-          // 更新今日获得
-          const todayEl = document.getElementById('todayEarn');
-          const current = parseInt(todayEl.textContent.replace('+', '')) || 0;
-          todayEl.textContent = '+' + (current + res.points_added);
-
-          // 实时刷新：标记为待审核
           window._todayDoneItems.add(itemId);
           window._pendingItems.add(itemId);
           window._clockStatusMap[itemId] = {
@@ -523,10 +515,7 @@
           };
           renderButtons();
 
-          showToast(res.streak_bonus > 0
-            ? `🔥 连续${res.streak}天！+${res.points_added}分`
-            : `✅ +${res.points_added} 分！`
-          );
+          showToast('📨 已提交，等待家长审核');
         } else {
           showToast('❌ ' + (res.error || '失败'));
         }
