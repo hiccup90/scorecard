@@ -57,7 +57,13 @@ const getBalance = (userId) => {
   return row.total;
 };
 
-const todayKey = () => new Date().toISOString().slice(0, 10);
+const todayKey = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
 
 const addHours = (date, hours) => {
   const d = new Date(date);
@@ -163,12 +169,7 @@ function revertStreak(userId, itemId) {
   ).get(userId, itemId);
   if (!streak) return;
 
-  if (streak.streak_days <= 1) {
-    db.prepare('DELETE FROM streaks WHERE user_id = ? AND item_id = ?').run(userId, itemId);
-    return;
-  }
-
-  // 找到上一个 confirmed 打卡日期
+  // 找到上一个 confirmed 打卡日期（排除当前被撤回的）
   const prev = db.prepare(`
     SELECT date(created_at) as prev_date 
     FROM clock_requests 
@@ -177,9 +178,23 @@ function revertStreak(userId, itemId) {
   `).get(userId, itemId);
 
   if (prev) {
+    // 从 prev_date 往前推算实际连续天数
+    const prevDate = new Date(prev.prev_date + 'T00:00:00');
+    let count = 1;
+    for (let i = 1; i < 365; i++) {
+      const check = new Date(prevDate);
+      check.setDate(check.getDate() - i);
+      const checkKey = check.toISOString().slice(0, 10);
+      const exists = db.prepare(`
+        SELECT 1 FROM clock_requests 
+        WHERE user_id = ? AND item_id = ? AND status = 'confirmed' AND date(created_at) = ?
+      `).get(userId, itemId, checkKey);
+      if (exists) count++;
+      else break;
+    }
     db.prepare(
-      'UPDATE streaks SET streak_days = streak_days - 1, last_date = ? WHERE user_id = ? AND item_id = ?'
-    ).run(prev.prev_date, userId, itemId);
+      'UPDATE streaks SET streak_days = ?, last_date = ? WHERE user_id = ? AND item_id = ?'
+    ).run(count, prev.prev_date, userId, itemId);
   } else {
     db.prepare('DELETE FROM streaks WHERE user_id = ? AND item_id = ?').run(userId, itemId);
   }
@@ -512,6 +527,9 @@ app.post('/api/redemptions/:id/approve', auth, (req, res) => {
 });
 
 app.post('/api/redemptions/:id/reject', auth, (req, res) => {
+  const row = db.prepare('SELECT * FROM redemption_requests WHERE id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ error: '不存在' });
+  if (row.status !== 'pending') return res.status(400).json({ error: '只能驳回待审批的兑换' });
   db.prepare(
     'UPDATE redemption_requests SET status=? WHERE id=?'
   ).run('rejected', req.params.id);

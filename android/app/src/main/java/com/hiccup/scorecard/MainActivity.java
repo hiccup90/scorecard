@@ -104,7 +104,12 @@ public class MainActivity extends AppCompatActivity {
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState);
         } else {
-            webView.loadUrl(getHomeUrl());
+            String homeUrl = getHomeUrl();
+            if (homeUrl == null || homeUrl.isEmpty()) {
+                showServerSettingsDialog();
+            } else {
+                webView.loadUrl(homeUrl);
+            }
         }
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -143,7 +148,7 @@ public class MainActivity extends AppCompatActivity {
 
         new AlertDialog.Builder(this)
                 .setTitle("服务器地址")
-                .setMessage("请输入孩子端要打开的地址，例如 http://10.10.10.16:3003/")
+                .setMessage("请输入积分打卡服务器地址，例如 http://192.168.1.100:3003/")
                 .setView(input)
                 .setNegativeButton("取消", null)
                 .setNeutralButton("恢复默认", (dialog, which) -> {

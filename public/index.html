@@ -319,6 +319,12 @@
     let allStreaks = [];
     let activeCategory = null;
 
+    // ── XSS 转义 ──
+    function escapeHtml(str) {
+      if (str == null) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
     // ── 工具 ──
     function showToast(msg) {
       const t = document.getElementById('toast');
@@ -483,7 +489,7 @@
                ${onClick ? `onclick="${onClick}"` : ''}>
             ${streak >= 2 ? `<div class="streak-badge">🔥${streak}</div>` : ''}
             <span class="icon">${item.icon || '✨'}</span>
-            <div class="label">${item.label}</div>
+            <div class="label">${escapeHtml(item.label)}</div>
             <div class="points">${scoreText}</div>
           </div>
         `;
@@ -543,11 +549,11 @@
       }
 
       list.innerHTML = rewards.map(r => `
-        <div class="reward-card" onclick="redeem(${r.id}, '${r.name.replace(/'/g, "\\'")}', ${r.cost})">
+        <div class="reward-card" onclick="redeem(${r.id}, '${escapeHtml(r.name).replace(/'/g, "\\'")}', ${r.cost})">
           <div class="reward-icon">🎁</div>
           <div class="reward-info">
-            <div class="reward-name">${r.name}</div>
-            <div class="reward-desc">${r.description || ''}</div>
+            <div class="reward-name">${escapeHtml(r.name)}</div>
+            <div class="reward-desc">${escapeHtml(r.description || '')}</div>
           </div>
           <div class="reward-cost" style="color: ${balance >= r.cost ? '#FFD700' : '#FF5252'}">
             ${r.cost} 分
@@ -776,7 +782,7 @@
           <li class="log-item">
             <div class="log-icon">${log.icon || (log.change > 0 ? '⭐' : '💸')}</div>
             <div class="log-info">
-              <div class="log-reason">${log.item_label || log.reason || '积分变动'}</div>
+              <div class="log-reason">${escapeHtml(log.item_label) || escapeHtml(log.reason) || '积分变动'}</div>
               <div class="log-time">${time}</div>
             </div>
             <div class="log-change ${log.change > 0 ? 'positive' : 'negative'}">

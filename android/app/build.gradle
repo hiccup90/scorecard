@@ -16,7 +16,7 @@ android {
         targetSdk 34
         versionCode 1
         versionName '1.0.0'
-        buildConfigField 'String', 'HOME_URL', '"http://10.10.10.16:3003/"'
+        buildConfigField 'String', 'HOME_URL', '""'
     }
 
     buildTypes {

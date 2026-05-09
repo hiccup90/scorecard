@@ -210,7 +210,7 @@
     </div>
 
     <!-- 积分记录 -->
-    <div class="tab-content active" id="tab-log">
+    <div class="tab-content" id="tab-log">
       <div class="section-header">
         <span class="section-title">📋 积分流水</span>
         <select id="filterUser" onchange="loadLogs()" style="width:auto;font-size:13px;padding:6px 10px;">
@@ -239,7 +239,7 @@
     </div>
 
     <!-- 审核 -->
-    <div class="tab-content" id="tab-review">
+    <div class="tab-content active" id="tab-review">
       <!-- 打卡审核区 -->
       <div class="review-section-title">📝 打卡审核</div>
       <div id="clockReviewList"></div>
@@ -367,6 +367,12 @@ const API = '';
 const USER_ID = 1;
 const PARENT_ID = 2;
 
+// ── XSS 转义 ──
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 // ── 主题切换 ──
 (function initTheme() {
   const saved = localStorage.getItem('scorecard-theme');
@@ -428,7 +434,7 @@ async function doLogin() {
       authToken = data.token;
       sessionStorage.setItem('scorecard-token', authToken);
       document.getElementById('loginOverlay').classList.add('hidden');
-      loadOverview(); loadLogs(); loadItems(); loadRewards();
+      loadOverview(); loadLogs(); loadItems(); loadRewards(); loadReviewTab();
     } else {
       document.getElementById('loginError').textContent = data.error || 'PIN 码错误';
     }
@@ -451,7 +457,7 @@ document.getElementById('pinInput').addEventListener('keydown', e => {
     });
     if (!res.ok) { showLogin(); return; }
   } catch { showLogin(); return; }
-  loadOverview(); loadLogs(); loadItems(); loadRewards();
+  loadOverview(); loadLogs(); loadItems(); loadRewards(); loadReviewTab();
 })();
 
 // ── Tab 切换 ──
@@ -479,7 +485,8 @@ async function loadOverview() {
 
 // ── 积分记录 ──
 async function loadLogs() {
-  const logs = await api('/api/logs/1');
+  const userId = document.getElementById('filterUser')?.value || '1';
+  const logs = await api('/api/logs/' + userId);
   const list = document.getElementById('logsList');
   if (!logs.length) {
     list.innerHTML = '<div class="empty"><div class="icon">📋</div><div>暂无记录</div></div>';
@@ -492,7 +499,7 @@ async function loadLogs() {
         <div class="card-row">
           <div class="card-icon">${log.icon || '⭐'}</div>
           <div class="card-body">
-            <div class="card-title">${log.item_label || log.reason || '积分变动'}</div>
+            <div class="card-title">${escapeHtml(log.item_label) || escapeHtml(log.reason) || '积分变动'}</div>
             <div class="card-meta">${time}</div>
           </div>
           <div style="font-size:18px;font-weight:800;color:${log.change > 0 ? '#4CAF50' : '#FF5252'}">
@@ -525,7 +532,7 @@ async function loadItems() {
 
   list.innerHTML = sortedCats.map(cat => `
     <div class="cat-section">
-      <div class="cat-section-header">${cat}</div>
+      <div class="cat-section-header">${escapeHtml(cat)}</div>
       ${groups[cat].map(item => {
         const modeText = item.score_mode === 'quality'
           ? '质量'
@@ -537,13 +544,13 @@ async function loadItems() {
           <div class="card-row">
             <div class="card-icon">${item.icon || '⭐'}</div>
             <div class="card-body">
-              <div class="card-title">${item.label}</div>
+              <div class="card-title">${escapeHtml(item.label)}</div>
               <div class="card-meta">基础分 ${item.points} · ${modeText} · ${item.enabled ? '启用' : '禁用'}</div>
             </div>
             <div class="card-action" style="flex-wrap:wrap;gap:4px;">
               <button class="btn" style="background:var(--border);font-size:11px;padding:4px 8px;" onclick="moveItem(${item.id},'up')">↑</button>
               <button class="btn" style="background:var(--border);font-size:11px;padding:4px 8px;" onclick="moveItem(${item.id},'down')">↓</button>
-              <button class="btn" style="background:var(--border);font-size:12px;" onclick="editItem(${item.id}, '${item.label.replace(/'/g, "\\'")}', ${item.points}, '${item.score_mode || 'default'}', '${item.icon}', '${item.color}', '${item.category || '生活'}')">编辑</button>
+              <button class="btn" style="background:var(--border);font-size:12px;" onclick="editItem(${item.id}, '${escapeHtml(item.label).replace(/'/g, "\\'")}', ${item.points}, '${item.score_mode || 'default'}', '${item.icon}', '${item.color}', '${escapeHtml(item.category || '生活')}')">编辑</button>
               <button class="btn btn-red" style="font-size:12px;" onclick="deleteItem(${item.id})">删除</button>
             </div>
           </div>
@@ -605,12 +612,17 @@ async function saveItem() {
     icon: document.getElementById('itemIcon').value || '✨',
     color: '#6C63FF',
     category: document.getElementById('itemCategory').value,
-    enabled: true,
-    sort_order: 0,
   };
   if (id) {
+    // 编辑：读取当前值保留 enabled + sort_order
+    const current = await api(`/api/point-items`);
+    const existing = current.find(i => i.id == id);
+    body.enabled = existing ? existing.enabled : 1;
+    body.sort_order = existing ? existing.sort_order : 0;
     await api(`/api/point-items/${id}`, { method: 'PUT', body });
   } else {
+    body.enabled = true;
+    body.sort_order = 0;
     await api('/api/point-items', { method: 'POST', body });
   }
   closeItemModal();
@@ -640,11 +652,11 @@ async function loadRewards() {
     <div class="reward-card">
       <div class="r-icon">🎁</div>
       <div class="r-body">
-        <div class="r-name">${r.name}</div>
+        <div class="r-name">${escapeHtml(r.name)}</div>
         <div class="r-cost">${r.cost} 分 · ${r.auto_approve ? '自动通过' : '需审批'} · 库存 ${r.stock < 0 ? '∞' : r.stock}</div>
       </div>
       <div class="r-actions">
-        <button class="btn" style="background:var(--border);font-size:12px;" onclick="editReward(${r.id}, '${r.name.replace(/'/g, "\\'")}', ${r.cost}, '${(r.description || '').replace(/'/g, "\\'")}', ${r.stock}, ${r.auto_approve})">编辑</button>
+        <button class="btn" style="background:var(--border);font-size:12px;" onclick="editReward(${r.id}, '${escapeHtml(r.name).replace(/'/g, "\\'")}', ${r.cost}, '${escapeHtml(r.description || '').replace(/'/g, "\\'")}', ${r.stock}, ${r.auto_approve})">编辑</button>
         <button class="btn btn-red" style="font-size:12px;" onclick="deleteReward(${r.id})">删除</button>
       </div>
     </div>
@@ -685,11 +697,14 @@ async function saveReward() {
     description: document.getElementById('rewardDesc').value,
     stock: parseInt(document.getElementById('rewardStock').value),
     auto_approve: document.getElementById('rewardAutoApprove').value === '1',
-    enabled: true,
   };
   if (id) {
+    const current = await api('/api/rewards');
+    const existing = current.find(r => r.id == id);
+    body.enabled = existing ? existing.enabled : 1;
     await api(`/api/rewards/${id}`, { method: 'PUT', body });
   } else {
+    body.enabled = true;
     await api('/api/rewards', { method: 'POST', body });
   }
   closeRewardModal();
@@ -771,7 +786,7 @@ async function loadClockReview() {
           <div class="card-row" style="align-items:flex-start;">
             <div class="card-icon">${r.icon || '⭐'}</div>
             <div class="card-body">
-              <div class="card-title">${r.user_name || '孩子'} 打卡「${r.item_label}」${streakInfo} <span style="color:#FF9800;font-size:12px;">⏳待审核</span></div>
+              <div class="card-title">${escapeHtml(r.user_name) || '孩子'} 打卡「${escapeHtml(r.item_label)}」${streakInfo} <span style="color:#FF9800;font-size:12px;">⏳待审核</span></div>
               <div class="card-meta">${hintText} · ${dateStr} ${time}</div>
               <div class="card-action" style="margin-top:8px;flex-wrap:wrap;">
                 ${actionHtml}
@@ -798,7 +813,7 @@ async function loadClockReview() {
           <div class="card-row">
             <div class="card-icon">${r.icon || '⭐'}</div>
             <div class="card-body">
-              <div class="card-title">${r.user_name || '孩子'} 打卡「${r.item_label}」${streakInfo} <span style="color:#4CAF50;font-size:12px;">✓已通过</span></div>
+              <div class="card-title">${escapeHtml(r.user_name) || '孩子'} 打卡「${escapeHtml(r.item_label)}」${streakInfo} <span style="color:#4CAF50;font-size:12px;">✓已通过</span></div>
               <div class="card-meta">+${r.points_at_time} 分 · ${detailText} · ${dateStr} ${time}</div>
             </div>
             <div class="card-action">
@@ -810,14 +825,14 @@ async function loadClockReview() {
     }
 
     const reasonHtml = r.reverse_reason
-      ? `<div class="reject-reason">驳回原因：${r.reverse_reason}</div>`
+      ? `<div class="reject-reason">驳回原因：${escapeHtml(r.reverse_reason)}</div>`
       : '';
     return `
       <div class="card" style="opacity:0.5;">
         <div class="card-row">
           <div class="card-icon">${r.icon || '⭐'}</div>
           <div class="card-body">
-            <div class="card-title">${r.user_name || '孩子'} 打卡「${r.item_label}」${streakInfo} <span style="color:#FF5252;font-size:12px;">❌已撤回</span></div>
+            <div class="card-title">${escapeHtml(r.user_name) || '孩子'} 打卡「${escapeHtml(r.item_label)}」${streakInfo} <span style="color:#FF5252;font-size:12px;">❌已撤回</span></div>
             <div class="card-meta">${dateStr} ${time}</div>
             ${reasonHtml}
           </div>
@@ -894,7 +909,7 @@ async function loadPendingRedemptions() {
         <div class="card-row">
           <div class="card-icon">🎁</div>
           <div class="card-body">
-            <div class="card-title">${r.user_name} 兑换「${r.reward_name}」</div>
+            <div class="card-title">${escapeHtml(r.user_name)} 兑换「${escapeHtml(r.reward_name)}」</div>
             <div class="card-meta">${r.cost_at_time} 分 · ${time}</div>
           </div>
           <div class="card-action">
@@ -921,7 +936,7 @@ async function rejectRedemption(id) {
 }
 
 // ── 自动刷新 ──
-setInterval(loadOverview, 30000);
+setInterval(() => { loadOverview(); loadReviewTab(); }, 30000);
 </script>
 </body>
 </html>
