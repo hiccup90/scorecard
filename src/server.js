@@ -269,7 +269,7 @@ app.post('/api/clock', (req, res) => {
   const today = todayKey();
   const todayDone = db.prepare(
     `SELECT id FROM clock_requests WHERE user_id = ? AND item_id = ? 
-     AND date(created_at) = ? AND status != 'reversed'`
+     AND date(created_at) = ? AND status = 'pending'`
   ).get(user_id, item_id, today);
   if (todayDone) return res.status(400).json({ error: '今天已经打过卡了' });
 

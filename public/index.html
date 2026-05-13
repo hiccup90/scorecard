@@ -374,11 +374,21 @@
         // 过滤今天的请求
         const todayReqs = requests.filter(r => r.created_at && r.created_at.startsWith(todayStr));
 
-        // 构建 item_id → 最新请求的映射
+        // 构建 item_id → 当天阻塞状态映射
+        // 规则：只要当天存在 pending，就禁用按钮；confirmed / reversed 都不阻塞。
         window._clockStatusMap = {};
         for (const req of todayReqs) {
           const itemId = req.item_id;
-          if (!window._clockStatusMap[itemId] || req.created_at > window._clockStatusMap[itemId].created_at) {
+          const current = window._clockStatusMap[itemId];
+          if (req.status !== 'pending') {
+            continue;
+          }
+          if (!current) {
+            window._clockStatusMap[itemId] = req;
+            continue;
+          }
+
+          if (req.created_at > current.created_at) {
             window._clockStatusMap[itemId] = req;
           }
         }
@@ -389,7 +399,7 @@
         for (const key of Object.keys(window._clockStatusMap)) {
           const req = window._clockStatusMap[key];
           const itemId = parseInt(key);
-          if (req.status === 'reversed') continue; // 驳回 → 不算 done
+          if (req.status === 'reversed') continue; // 理论上不会进入，这里仅防御式保留
           window._todayDoneItems.add(itemId);
           if (req.status === 'pending') {
             window._pendingItems.add(itemId);
@@ -466,15 +476,11 @@
         let onClick = '';
 
         if (status === 'pending') {
-          // 待审核：半透明但可点击
+          // 待审核：半透明且禁用
           cssClass = 'done-pending pending-label';
-          onClick = `clock(${item.id}, this)`;
-        } else if (status === 'confirmed') {
-          // 已通过：灰色禁用
-          cssClass = 'done-confirmed done-label';
           onClick = '';
         } else {
-          // 无状态：正常可点击
+          // 已通过 / 驳回 / 无状态：都可继续点击
           cssClass = '';
           onClick = `clock(${item.id}, this)`;
         }
