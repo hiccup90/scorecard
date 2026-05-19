@@ -44,9 +44,9 @@ mkdir -p ./data
 
 ### docker run
 
-```bash
-docker build -t scorecard .
+仓库已通过 GitHub Actions 自动构建并发布镜像到 GHCR：`ghcr.io/hiccup90/scorecard:latest`
 
+```bash
 docker run -d \
   --name scorecard \
   -p 3003:3003 \
@@ -55,7 +55,13 @@ docker run -d \
   -e CHILD_PIN=1234 \
   -v "$(pwd)/data:/app/data" \
   --restart unless-stopped \
-  scorecard
+  ghcr.io/hiccup90/scorecard:latest
+```
+
+如果你要基于本地源码自行构建：
+
+```bash
+docker build -t scorecard .
 ```
 
 启动后访问：
@@ -70,7 +76,7 @@ docker run -d \
 ```yaml
 services:
   api:
-    build: .
+    image: ghcr.io/hiccup90/scorecard:latest
     ports:
       - "3003:3003"
     environment:
@@ -85,7 +91,7 @@ services:
 启动命令：
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
 说明：
