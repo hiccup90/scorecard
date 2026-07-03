@@ -51,6 +51,10 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 function App() {
   const [mode, setMode] = useState(location.pathname.startsWith('/admin') ? 'admin' : 'child');
   useEffect(() => history.replaceState(null, '', mode === 'admin' ? '/admin' : '/'), [mode]);
@@ -94,12 +98,12 @@ function ChildApp({ onAdmin }) {
       request('/rewards'),
       request('/redemptions'),
     ]);
-    setSummary(sum);
-    setActivities(acts);
-    setCheckins(cks);
-    setTransactions(txs);
-    setRewards(rws);
-    setRedemptions(reds);
+    setSummary(sum || {});
+    setActivities(asArray(acts));
+    setCheckins(asArray(cks));
+    setTransactions(asArray(txs));
+    setRewards(asArray(rws));
+    setRedemptions(asArray(reds));
   }
 
   useEffect(() => { if (verified) refresh().catch(e => setToast(e.message)); }, [verified]);
@@ -129,9 +133,14 @@ function ChildApp({ onAdmin }) {
     }
   }
 
-  const categories = useMemo(() => sortCategories([...new Set(activities.map(a => a.category || '其他'))]), [activities]);
-  const filtered = activeCat === '全部' ? activities : activities.filter(a => a.category === activeCat);
-  const todayPending = checkins.filter(c => c.status === 'pending').slice(0, 3);
+  const safeActivities = asArray(activities);
+  const safeCheckins = asArray(checkins);
+  const safeRewards = asArray(rewards);
+  const safeRedemptions = asArray(redemptions);
+  const safeTransactions = asArray(transactions);
+  const categories = useMemo(() => sortCategories([...new Set(safeActivities.map(a => a.category || '其他'))]), [safeActivities]);
+  const filtered = activeCat === '全部' ? safeActivities : safeActivities.filter(a => a.category === activeCat);
+  const todayPending = safeCheckins.filter(c => c.status === 'pending').slice(0, 3);
 
   if (!verified) return <Login title="欢迎打卡" icon={<ShieldCheck />} pin={pin} setPin={setPin} err={err} onSubmit={login} />;
 
@@ -166,21 +175,21 @@ function ChildApp({ onAdmin }) {
         <em>{a.category}</em>
       </button>)}</div>
       <SectionTitle icon={<History />} title="最近打卡" />
-      <CheckinList items={checkins.slice(0, 8)} />
+      <CheckinList items={safeCheckins.slice(0, 8)} />
     </section>}
 
     {tab === 'rewards' && <section className="child-page">
       <SectionTitle icon={<Gift />} title="积分兑换" />
-      <div className="reward-grid">{rewards.map(r => <button key={r.id} className="reward-card" onClick={() => redeem(r)}>
+      <div className="reward-grid">{safeRewards.map(r => <button key={r.id} className="reward-card" onClick={() => redeem(r)}>
         <span><Gift /></span><strong>{r.name}</strong><small>{r.description || (r.auto_approve ? '自动通过' : '需要审批')}</small><b>{r.cost} 分</b>
       </button>)}</div>
       <SectionTitle icon={<ListChecks />} title="兑换记录" />
-      <RedemptionList items={redemptions} />
+      <RedemptionList items={safeRedemptions} />
     </section>}
 
     {tab === 'records' && <section className="child-page">
       <SectionTitle icon={<History />} title="积分流水" />
-      <TransactionList items={transactions} />
+      <TransactionList items={safeTransactions} />
     </section>}
 
     <nav className="bottom-nav">
@@ -231,12 +240,12 @@ function AdminApp({ onChild }) {
       request('/admin/redemptions'),
       request('/transactions'),
     ]);
-    setSummary(sum);
-    setCheckins(cks);
-    setActivities(acts);
-    setRewards(rws);
-    setRedemptions(reds);
-    setTransactions(txs);
+    setSummary(sum || {});
+    setCheckins(asArray(cks));
+    setActivities(asArray(acts));
+    setRewards(asArray(rws));
+    setRedemptions(asArray(reds));
+    setTransactions(asArray(txs));
   }
 
   useEffect(() => { if (token) refresh().catch(e => setToast(e.message)); }, [token]);
@@ -314,9 +323,14 @@ function AdminApp({ onChild }) {
 
   if (!token) return <Login title="家长验证" icon={<Lock />} pin={pin} setPin={setPin} err={err} onSubmit={login} />;
 
-  const pendingCheckins = checkins.filter(c => c.status === 'pending');
-  const recentCheckins = checkins.filter(c => c.status !== 'pending').slice(0, 8);
-  const pendingRedemptions = redemptions.filter(r => r.status === 'pending');
+  const safeCheckins = asArray(checkins);
+  const safeActivities = asArray(activities);
+  const safeRewards = asArray(rewards);
+  const safeRedemptions = asArray(redemptions);
+  const safeTransactions = asArray(transactions);
+  const pendingCheckins = safeCheckins.filter(c => c.status === 'pending');
+  const recentCheckins = safeCheckins.filter(c => c.status !== 'pending').slice(0, 8);
+  const pendingRedemptions = safeRedemptions.filter(r => r.status === 'pending');
 
   return <main className="admin-app">
     {toast && <Toast>{toast}</Toast>}
@@ -350,12 +364,12 @@ function AdminApp({ onChild }) {
 
       {tab === 'activities' && <section className="admin-section split-layout">
         <div><SectionTitle icon={<BookOpen />} title="打卡项配置" /><ActivityForm draft={draftActivity} setDraft={setDraftActivity} onSubmit={saveActivity} /></div>
-        <div><SectionTitle icon={<ListChecks />} title="项目列表" /><ActivityTable items={activities} onEdit={setDraftActivity} /></div>
+        <div><SectionTitle icon={<ListChecks />} title="项目列表" /><ActivityTable items={safeActivities} onEdit={setDraftActivity} /></div>
       </section>}
 
       {tab === 'rewards' && <section className="admin-section split-layout">
         <div><SectionTitle icon={<Gift />} title="奖励配置" /><RewardForm draft={draftReward} setDraft={setDraftReward} onSubmit={saveReward} /></div>
-        <div><SectionTitle icon={<Award />} title="奖励列表" /><RewardTable items={rewards} onEdit={setDraftReward} /></div>
+        <div><SectionTitle icon={<Award />} title="奖励列表" /><RewardTable items={safeRewards} onEdit={setDraftReward} /></div>
       </section>}
 
       {tab === 'ledger' && <section className="admin-section">
@@ -366,7 +380,7 @@ function AdminApp({ onChild }) {
           <button><Check size={17} />确认</button>
         </form>
         <SectionTitle icon={<History />} title="积分流水" />
-        <TransactionList items={transactions} />
+        <TransactionList items={safeTransactions} />
       </section>}
     </section>
 
@@ -439,16 +453,19 @@ function Segmented({ value, onChange, options }) {
 }
 
 function CheckinList({ items }) {
+  items = asArray(items);
   if (!items.length) return <EmptyState text="暂无打卡记录" />;
   return <div className="record-list">{items.map(c => <RecordRow key={c.id} icon={iconNode(c.activity_icon)} title={c.activity_label} meta={`${c.activity_date} · ${status(c.status)} · ${c.source === 'makeup' ? '补签' : '正常'}`} value={c.awarded_points + c.streak_bonus || '-'} badge={c.source === 'makeup' ? '补签' : null} />)}</div>;
 }
 
 function RedemptionList({ items }) {
+  items = asArray(items);
   if (!items.length) return <EmptyState text="暂无兑换记录" />;
   return <div className="record-list">{items.map(r => <RecordRow key={r.id} icon={<Gift />} title={r.reward_name} meta={status(r.status)} value={`${r.cost_at_time}分`} />)}</div>;
 }
 
 function TransactionList({ items }) {
+  items = asArray(items);
   if (!items.length) return <EmptyState text="暂无积分流水" />;
   return <div className="record-list">{items.map(t => <RecordRow key={t.id} icon={t.change > 0 ? <Plus /> : <ChevronRight />} title={t.reason} meta={`${formatTime(t.created_at)} · ${sourceLabel(t.source_type)}`} value={signed(t.change)} tone={t.change > 0 ? 'positive' : 'negative'} />)}</div>;
 }
@@ -463,6 +480,7 @@ function RecordRow({ icon, title, meta, value, tone, badge }) {
 }
 
 function AdminCheckins({ items, empty, onApprove, onReject, onReverse }) {
+  items = asArray(items);
   if (!items.length) return <EmptyState text={empty} />;
   return <div className="admin-list">{items.map(c => <div key={c.id} className="admin-item">
     <span className="record-icon">{iconNode(c.activity_icon)}</span>
@@ -472,6 +490,7 @@ function AdminCheckins({ items, empty, onApprove, onReject, onReverse }) {
 }
 
 function AdminRedemptions({ items, onApprove, onReject }) {
+  items = asArray(items);
   if (!items.length) return <EmptyState text="暂无待审批兑换" />;
   return <div className="admin-list">{items.map(r => <div key={r.id} className="admin-item">
     <span className="record-icon"><Gift /></span>
@@ -496,6 +515,7 @@ function IconPicker({ value, onChange }) {
 }
 
 function ActivityTable({ items, onEdit }) {
+  items = asArray(items);
   if (!items.length) return <EmptyState text="暂无打卡项" />;
   return <div className="admin-list compact-list">{items.map(a => <div key={a.id} className="admin-item"><span className="record-icon">{iconNode(a.icon)}</span><div className="admin-item-main"><strong>{a.label}</strong><small>{a.category} · {scoreText(a)} · {a.enabled ? '启用' : '停用'}</small></div><button className="secondary" onClick={() => onEdit(a)}><PenLine size={16} />编辑</button></div>)}</div>;
 }
@@ -511,6 +531,7 @@ function RewardForm({ draft, setDraft, onSubmit }) {
 }
 
 function RewardTable({ items, onEdit }) {
+  items = asArray(items);
   if (!items.length) return <EmptyState text="暂无奖励" />;
   return <div className="admin-list compact-list">{items.map(r => <div key={r.id} className="admin-item"><span className="record-icon"><Gift /></span><div className="admin-item-main"><strong>{r.name}</strong><small>{r.cost} 分 · {r.auto_approve ? '自动通过' : '需审批'} · 库存 {r.stock < 0 ? '无限' : r.stock}</small></div><button className="secondary" onClick={() => onEdit(r)}><PenLine size={16} />编辑</button></div>)}</div>;
 }
