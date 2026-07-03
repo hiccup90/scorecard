@@ -1,5 +1,6 @@
 services:
   api:
+    image: ghcr.io/hiccup90/scorecard:latest
     build: .
     ports:
       - "3003:3003"
