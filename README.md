@@ -1,16 +1,23 @@
 # scorecard
 
-一个面向家庭场景的积分电子打卡系统：
+一个面向家庭场景的积分电子打卡系统。新版后端改为 Go + SQLite，前端改为 React/Vite，目标是让补签、重复打卡、审核、撤回和积分流水更可靠。
 
-- 孩子端：Web 页面 + Android WebView APK 壳
-- 家长端：Web 管理后台
-- 后端：Node.js + Express + SQLite
+## 核心规则
 
-## 本地启动
+- 积分余额只从 `point_transactions` 流水汇总得到。
+- 打卡可以重复提交，也可以选择过去日期补签。
+- 打卡记录有 `activity_date`，连续天数按这个日期计算，不按提交时间计算。
+- 审核通过会创建正积分流水；撤回不会删除旧流水，而是创建负积分冲正流水。
+- 奖励兑换会创建负积分流水；需要审批的奖励由家长通过后扣分。
+
+## 本地开发
+
+需要 Go 和 Node.js。
 
 ```bash
-npm install
-node src/server.js
+npm --prefix web install
+npm --prefix web run build
+go run ./cmd/scorecard
 ```
 
 默认访问：
@@ -18,86 +25,44 @@ node src/server.js
 - 孩子端：`http://localhost:3003/`
 - 家长后台：`http://localhost:3003/admin`
 
-## Android APK 壳
+默认 PIN：
 
-Android 工程位于：
+- `ADMIN_PIN=1234`
+- `CHILD_PIN` 未设置时跟随 `ADMIN_PIN`
 
-```text
-android/
-```
-
-调试构建：
+## 常用命令
 
 ```bash
-cd android
-./gradlew assembleDebug
+npm run build:web
+npm run build:api
+npm run build
+npm run check
 ```
 
 ## Docker
 
-容器内服务默认监听 `3003` 端口，SQLite 数据库文件写入 `/app/data/scorecard.db`。
-首次启动前请先准备宿主机数据目录：
-
 ```bash
 mkdir -p ./data
+docker compose up -d --build
 ```
 
-### docker run
+SQLite 数据库默认写入：
 
-仓库已通过 GitHub Actions 自动构建并发布镜像到 GHCR：`ghcr.io/hiccup90/scorecard:latest`
-
-```bash
-docker run -d \
-  --name scorecard \
-  -p 3003:3003 \
-  -e PORT=3003 \
-  -e ADMIN_PIN=1234 \
-  -e CHILD_PIN=1234 \
-  -v "$(pwd)/data:/app/data" \
-  --restart unless-stopped \
-  ghcr.io/hiccup90/scorecard:latest
+```text
+./data/scorecard.db
 ```
 
-如果你要基于本地源码自行构建：
+## 目录结构
 
-```bash
-docker build -t scorecard .
+```text
+cmd/scorecard/          Go 服务入口
+internal/config/        配置读取
+internal/database/      SQLite 建表和默认数据
+internal/server/        HTTP API 和业务规则
+web/                    React/Vite 前端
+android/                Android WebView 壳
 ```
 
-启动后访问：
+## 旧版说明
 
-- 孩子端：`http://localhost:3003/`
-- 家长后台：`http://localhost:3003/admin`
-
-### docker compose
-
-项目已包含 `docker-compose.yml`，关键配置如下：
-
-```yaml
-services:
-  api:
-    image: ghcr.io/hiccup90/scorecard:latest
-    ports:
-      - "3003:3003"
-    environment:
-      PORT: 3003
-      ADMIN_PIN: 1234
-      CHILD_PIN: 1234
-    volumes:
-      - ./data:/app/data
-    restart: unless-stopped
-```
-
-启动命令：
-
-```bash
-docker compose up -d
-```
-
-说明：
-
-- `-p 3003:3003` / `ports: 3003:3003`：把宿主机 `3003` 端口映射到容器内应用端口。
-- `ADMIN_PIN`：家长后台登录 PIN；未设置时默认值是 `1234`。
-- `CHILD_PIN`：孩子端校验 PIN；未设置时默认跟随 `ADMIN_PIN`。
-- `./data:/app/data`：持久化 SQLite 数据目录，数据库文件位于 `./data/scorecard.db`。
-- 如果你要修改宿主机端口，可以同时调整左侧映射端口；容器内端口仍保持 `3003`，或额外通过 `PORT` 环境变量同步修改应用监听端口。
+旧的 Node/Express 源码仍保留在 `src/` 和 `public/`，方便对照或后续写数据迁移脚本。新版运行入口是 `cmd/scorecard`，Docker 也已经切到 Go 服务。

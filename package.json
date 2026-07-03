@@ -1,14 +1,12 @@
 {
   "name": "scorecard",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "type": "module",
   "scripts": {
-    "start": "node src/server.js",
-    "check": "node --check src/server.js"
-  },
-  "dependencies": {
-    "better-sqlite3": "^11.10.0",
-    "express": "^4.21.2"
+    "dev": "go run ./cmd/scorecard",
+    "build:web": "npm --prefix web run build",
+    "build:api": "go build -o dist/scorecard ./cmd/scorecard",
+    "build": "npm run build:web && npm run build:api",
+    "check": "go test ./... && npm --prefix web run build"
   }
 }

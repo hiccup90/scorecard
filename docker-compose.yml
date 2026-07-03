@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   api:
     build: .
@@ -10,4 +9,6 @@ services:
       - PORT=3003
       - ADMIN_PIN=${ADMIN_PIN:-1234}
       - CHILD_PIN=${CHILD_PIN:-${ADMIN_PIN:-1234}}
+      - DB_PATH=/app/data/scorecard.db
+      - STATIC_DIR=/app/web/dist
     restart: unless-stopped
