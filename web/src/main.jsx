@@ -165,12 +165,11 @@ function ChildApp({ onAdmin }) {
       </div>
     </section>
 
-    <section className="daily-strip">
-      <div><span><Target /></span><strong>{activityDate === today() ? '今日任务' : '补签任务'}</strong><small>{filtered.length} 个项目可选</small></div>
-      <div><span><Clock3 /></span><strong>{pendingCheckins.length}</strong><small>待审核</small></div>
-    </section>
-
     {tab === 'checkin' && <section className="child-page">
+      <div className="daily-strip">
+        <div><span><Target /></span><strong>{activityDate === today() ? '今日任务' : '补签任务'}</strong><small>{filtered.length} 个项目可选</small></div>
+        <div><span><Clock3 /></span><strong>{pendingCheckins.length}</strong><small>待审核</small></div>
+      </div>
       <div className="date-panel">
         <div><strong>{activityDate === today() ? '今天打卡' : '补签打卡'}</strong><span>{formatDateLabel(activityDate)}</span></div>
         <div className="date-controls"><button type="button" className="secondary" onClick={() => setActivityDate(today())}>今天</button><button type="button" className="secondary" onClick={() => setActivityDate(offsetDate(-1))}>昨天</button><label><CalendarDays size={17} /><input type="date" value={activityDate} max={today()} onChange={e => setActivityDate(e.target.value)} /></label></div>
@@ -358,7 +357,7 @@ function AdminApp({ onChild }) {
     </aside>
     <section className="admin-main">
       <header className="admin-header">
-        <div><span className="admin-kicker">家长工作台</span><h1>{tabLabel(tab)}</h1><p>重复打卡和补签会保留原始记录，积分只从流水汇总。</p></div>
+        <div><span className="admin-kicker">家长工作台</span><h1>{tabLabel(tab)}</h1><p>账务、审核与配置总览</p></div>
         <button className="secondary refresh-btn" onClick={refresh}><RotateCcw size={17} />刷新</button>
       </header>
       <div className="admin-stats">
