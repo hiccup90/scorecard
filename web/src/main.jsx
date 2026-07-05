@@ -163,16 +163,24 @@ function ChildApp({ onAdmin }) {
 
   return <main className="child-app">
     {toast && <Toast>{toast}</Toast>}
-    <section className="child-hero">
-      <div className="hero-topline"><span><Sparkles />积分打卡</span><button className="ghost-icon parent-entry" onClick={onAdmin} title="家长管理"><Settings size={19} /></button></div>
-      <div className="hero-label">当前积分</div>
-      <div className="hero-balance">{summary?.balance ?? 0}</div>
-      <div className="hero-stats">
-        <MiniStat icon={<Coins />} label="今日" value={signed(summary?.today_total ?? 0)} />
-        <MiniStat icon={<Clock3 />} label="待审核" value={summary?.pending_count ?? 0} />
-        <MiniStat icon={<Trophy />} label="最长连续" value={`${summary?.max_streak_days ?? 0}天`} />
-      </div>
-    </section>
+    <aside className="child-sidebar">
+      <section className="child-hero">
+        <div className="hero-topline"><span><Sparkles />积分打卡</span><button className="ghost-icon parent-entry" onClick={onAdmin} title="家长管理"><Settings size={19} /></button></div>
+        <div className="hero-label">当前积分</div>
+        <div className="hero-balance">{summary?.balance ?? 0}</div>
+        <div className="hero-stats">
+          <MiniStat icon={<Coins />} label="今日" value={signed(summary?.today_total ?? 0)} />
+          <MiniStat icon={<Clock3 />} label="待审核" value={summary?.pending_count ?? 0} />
+          <MiniStat icon={<Trophy />} label="最长连续" value={`${summary?.max_streak_days ?? 0}天`} />
+        </div>
+      </section>
+
+      <nav className="bottom-nav">
+        <button className={tab === 'checkin' ? 'active' : ''} onClick={() => setTab('checkin')}><ClipboardCheck />打卡</button>
+        <button className={tab === 'rewards' ? 'active' : ''} onClick={() => setTab('rewards')}><Gift />奖励</button>
+        <button className={tab === 'records' ? 'active' : ''} onClick={() => setTab('records')}><History />记录</button>
+      </nav>
+    </aside>
 
     {tab === 'checkin' && <section className="child-page">
       <div className="daily-strip">
@@ -214,11 +222,6 @@ function ChildApp({ onAdmin }) {
       <TransactionList items={safeTransactions} />
     </section>}
 
-    <nav className="bottom-nav">
-      <button className={tab === 'checkin' ? 'active' : ''} onClick={() => setTab('checkin')}><ClipboardCheck />打卡</button>
-      <button className={tab === 'rewards' ? 'active' : ''} onClick={() => setTab('rewards')}><Gift />奖励</button>
-      <button className={tab === 'records' ? 'active' : ''} onClick={() => setTab('records')}><History />记录</button>
-    </nav>
   </main>;
 }
 
