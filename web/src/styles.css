@@ -4,11 +4,11 @@
 
 @layer base {
   :root {
-    --background: 210 25% 97%;
-    --foreground: 222 47% 11%;
+    --background: 220 24% 97%;
+    --foreground: 224 36% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --primary: 221 83% 53%;
+    --card-foreground: 224 36% 12%;
+    --primary: 222 84% 56%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96%;
     --secondary-foreground: 222 47% 11%;
@@ -24,9 +24,9 @@
     --radius: 8px;
   }
   * { @apply border-border; }
-  body { @apply m-0 bg-background text-foreground antialiased; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  body { @apply m-0 bg-background text-foreground antialiased; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background-image: radial-gradient(circle at 16% 8%, rgba(37, 99, 235, .10), transparent 30%), radial-gradient(circle at 88% 16%, rgba(245, 158, 11, .11), transparent 28%), linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%); background-attachment: fixed; }
   button, input, select { font: inherit; }
-  button { @apply inline-flex min-h-9 items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50; }
+  button { @apply inline-flex min-h-9 items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35 disabled:pointer-events-none disabled:opacity-50; }
   button.secondary { @apply bg-secondary text-secondary-foreground hover:bg-secondary/80; }
   button.danger { @apply bg-destructive text-destructive-foreground hover:bg-destructive/90; }
   input, select { @apply h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm outline-none transition focus:ring-2 focus:ring-ring/25; }
@@ -41,120 +41,159 @@
   @keyframes spin { to { transform: rotate(360deg); } }
 
   .child-app { @apply mx-auto min-h-screen w-full max-w-xl px-3 pb-24 pt-3; }
-  .child-hero { @apply relative overflow-hidden rounded-lg border bg-card p-5 shadow-soft; }
-  .child-hero:before { content: ''; @apply absolute inset-x-0 top-0 h-1 bg-primary; }
-  .parent-entry { @apply absolute right-4 top-4; }
-  .hero-label { @apply text-sm text-muted-foreground; }
-  .hero-balance { @apply mt-1 text-7xl font-bold tracking-normal text-foreground; }
-  .hero-stats { @apply mt-5 grid grid-cols-3 gap-2; }
-  .mini-stat { @apply rounded-lg border bg-muted/40 p-3; }
-  .mini-stat span { @apply text-primary; }
-  .mini-stat b { @apply mt-1 block text-base font-semibold; }
+  .child-hero { @apply relative overflow-hidden rounded-[28px] border-0 p-5 text-white shadow-lift; background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 48%, #0f766e 100%); }
+  .child-hero:before { content: ''; @apply absolute -right-16 -top-20 size-56 rounded-full bg-white/10; }
+  .child-hero:after { content: ''; @apply absolute -bottom-24 left-8 size-64 rounded-full bg-amber-300/20; }
+  .hero-topline { @apply relative z-10 mb-6 flex items-center justify-between; }
+  .hero-topline span { @apply inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium text-white/90 backdrop-blur; }
+  .parent-entry { @apply bg-white/15 text-white hover:bg-white/25; }
+  .hero-label { @apply relative z-10 text-sm text-white/70; }
+  .hero-balance { @apply relative z-10 mt-1 text-7xl font-black tracking-normal text-white; text-shadow: 0 12px 34px rgba(15, 23, 42, .28); }
+  .hero-stats { @apply relative z-10 mt-6 grid grid-cols-3 gap-2; }
+  .mini-stat { @apply rounded-2xl border border-white/15 bg-white/15 p-3 backdrop-blur; }
+  .mini-stat span { @apply text-amber-200; }
+  .mini-stat b { @apply mt-1 block text-base font-bold text-white; }
+  .mini-stat small { @apply text-white/70; }
+
+  .daily-strip { @apply mt-3 grid grid-cols-[1fr_auto] gap-3; }
+  .daily-strip > div { @apply flex items-center gap-3 rounded-2xl bg-card/90 p-3 shadow-soft backdrop-blur; }
+  .daily-strip span { @apply grid size-10 place-items-center rounded-2xl bg-primary/10 text-primary; }
+  .daily-strip strong { @apply block text-sm font-bold; }
+  .daily-strip small { @apply text-xs text-muted-foreground; }
 
   .child-page { @apply pt-4; }
-  .date-panel { @apply flex items-center justify-between gap-3 rounded-lg border bg-card p-3 shadow-sm; }
+  .date-panel { @apply flex items-center justify-between gap-3 rounded-2xl border bg-card/90 p-3 shadow-soft backdrop-blur; }
   .date-panel strong { @apply block text-sm font-semibold; }
   .date-panel span { @apply text-xs text-muted-foreground; }
-  .date-panel label { @apply flex min-w-40 items-center gap-2 text-primary; }
+  .date-controls { @apply flex flex-wrap items-center justify-end gap-2; }
+  .date-controls > button { @apply min-h-9 rounded-full px-3 text-xs; }
+  .date-panel label { @apply flex min-w-40 items-center gap-2 rounded-full border bg-background px-3 text-primary; }
+  .date-panel input { @apply h-9 border-0 bg-transparent p-0 focus:ring-0; }
   .pending-strip { @apply mt-3 flex gap-2 overflow-x-auto pb-1; }
   .pending-strip span { @apply shrink-0 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800; }
 
-  .segmented { @apply my-3 flex gap-1 overflow-x-auto rounded-lg border bg-card p-1; }
-  .segmented button { @apply min-h-8 flex-1 whitespace-nowrap bg-transparent px-3 py-1.5 text-muted-foreground hover:bg-muted; }
-  .segmented button.active { @apply bg-primary text-primary-foreground hover:bg-primary; }
+  .segmented { @apply my-3 flex gap-1 overflow-x-auto rounded-2xl border-0 bg-card/90 p-1.5 shadow-soft backdrop-blur; }
+  .segmented button { @apply min-h-9 flex-1 whitespace-nowrap rounded-xl bg-transparent px-3 py-1.5 text-muted-foreground hover:bg-muted; }
+  .segmented button.active { @apply bg-slate-950 text-white shadow-sm hover:bg-slate-950; }
 
   .activity-grid { @apply grid grid-cols-2 gap-3; }
-  .activity-card { @apply relative min-h-32 flex-col items-start justify-start rounded-lg border bg-card p-4 text-left text-card-foreground shadow-sm hover:border-primary/40 hover:bg-primary/5; }
-  .activity-card strong { @apply mt-3 text-base font-semibold; }
-  .activity-card em { @apply absolute right-3 top-3 rounded-full bg-secondary px-2 py-0.5 text-xs not-italic text-muted-foreground; }
-  .activity-icon { @apply grid size-10 place-items-center rounded-lg bg-primary/10 text-xl text-primary; }
+  .activity-card { @apply relative min-h-40 flex-col items-start justify-start overflow-hidden rounded-3xl border-0 bg-card p-4 text-left text-card-foreground shadow-soft transition hover:-translate-y-0.5 hover:shadow-lift active:translate-y-0; }
+  .activity-card:before { content: ''; @apply absolute inset-x-0 top-0 h-1.5 bg-primary; }
+  .activity-card[data-category='语文']:before { @apply bg-emerald-500; }
+  .activity-card[data-category='数学']:before { @apply bg-rose-500; }
+  .activity-card[data-category='英语']:before { @apply bg-sky-500; }
+  .activity-card[data-category='科学']:before { @apply bg-violet-500; }
+  .activity-card[data-category='生活']:before { @apply bg-orange-500; }
+  .activity-card[data-category='才艺']:before { @apply bg-fuchsia-500; }
+  .activity-card strong { @apply mt-4 text-lg font-bold; }
+  .activity-category { @apply absolute right-3 top-3 rounded-full bg-secondary/80 px-2 py-0.5 text-xs text-muted-foreground; }
+  .activity-icon { @apply grid size-12 place-items-center rounded-2xl bg-primary/10 text-2xl text-primary; }
+  .mode-pill { @apply mt-auto rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground; }
 
   .reward-grid { @apply grid grid-cols-2 gap-3; }
-  .reward-card { @apply min-h-36 flex-col items-start justify-start rounded-lg border bg-card p-4 text-left text-card-foreground shadow-sm hover:border-primary/40 hover:bg-primary/5; }
-  .reward-card span { @apply grid size-10 place-items-center rounded-lg bg-amber-100 text-amber-700; }
-  .reward-card strong { @apply mt-3 text-base font-semibold; }
-  .reward-card b { @apply mt-auto text-sm font-semibold text-amber-700; }
+  .reward-card { @apply min-h-40 flex-col items-start justify-start rounded-3xl border-0 bg-card p-4 text-left text-card-foreground shadow-soft transition hover:-translate-y-0.5 hover:shadow-lift active:translate-y-0; }
+  .reward-card span { @apply grid size-12 place-items-center rounded-2xl bg-amber-100 text-amber-700; }
+  .reward-card strong { @apply mt-3 text-base font-bold; }
+  .reward-footer { @apply mt-auto flex w-full items-center justify-between gap-2; }
+  .reward-footer b { @apply text-sm font-bold text-amber-700; }
+  .reward-footer em { @apply rounded-full bg-amber-50 px-2 py-1 text-xs not-italic text-amber-700; }
 
-  .bottom-nav { @apply fixed inset-x-0 bottom-0 z-20 mx-auto grid w-full max-w-xl grid-cols-3 gap-2 border-t bg-background/95 px-3 py-2 backdrop-blur; }
-  .bottom-nav button { @apply min-h-12 flex-col gap-1 bg-transparent text-xs text-muted-foreground hover:bg-muted; }
-  .bottom-nav button.active { @apply bg-primary text-primary-foreground hover:bg-primary; }
+  .bottom-nav { @apply fixed inset-x-0 bottom-3 z-20 mx-auto grid w-[calc(100%-24px)] max-w-xl grid-cols-3 gap-2 rounded-2xl border bg-card/90 p-2 shadow-lift backdrop-blur; }
+  .bottom-nav button { @apply min-h-12 flex-col gap-1 rounded-xl bg-transparent text-xs text-muted-foreground hover:bg-muted; }
+  .bottom-nav button.active { @apply bg-primary text-primary-foreground shadow-sm hover:bg-primary; }
 
-  .section-title { @apply mb-3 mt-5 flex items-center gap-2; }
-  .section-title > span { @apply text-primary; }
+  .section-title { @apply mb-3 mt-6 flex items-center gap-2; }
+  .section-title > span { @apply grid size-8 place-items-center rounded-xl bg-primary/10 text-primary; }
   .section-title em { @apply ml-auto text-xs not-italic text-muted-foreground; }
   .record-list, .admin-list { @apply grid gap-2; }
-  .record-row, .admin-item { @apply flex min-w-0 items-center gap-3 rounded-lg border bg-card p-3 shadow-sm; }
-  .record-icon { @apply grid size-9 shrink-0 place-items-center rounded-lg bg-secondary text-lg text-primary; }
+  .record-row, .admin-item { @apply flex min-w-0 items-center gap-3 rounded-2xl border bg-card p-3 shadow-sm; }
+  .record-icon { @apply grid size-10 shrink-0 place-items-center rounded-2xl bg-secondary text-lg text-primary; }
   .record-main, .admin-item-main { @apply min-w-0 flex-1; }
   .record-main strong, .admin-item-main strong { @apply block truncate text-sm font-medium; }
   .record-row b { @apply ml-auto whitespace-nowrap text-sm font-semibold; }
   .positive { @apply text-emerald-600; }
   .negative { @apply text-destructive; }
-  .badge { @apply mt-1 inline-flex w-max items-center rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground; }
+  .badge { @apply inline-flex w-max items-center rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground; }
   .badge.pending { @apply bg-amber-100 text-amber-800; }
   .badge.approved, .badge.fulfilled { @apply bg-emerald-100 text-emerald-800; }
   .badge.rejected, .badge.reversed { @apply bg-red-100 text-red-800; }
   .badge.soft { @apply mt-0 bg-primary/10 text-primary; }
-  .empty-state { @apply grid min-h-20 place-items-center gap-2 rounded-lg border border-dashed bg-card/60 p-5 text-center text-sm text-muted-foreground; }
+  .empty-state { @apply grid min-h-24 place-items-center gap-2 rounded-2xl border border-dashed bg-card/70 p-6 text-center text-sm text-muted-foreground shadow-sm; }
+  .empty-state svg { @apply size-5 text-primary/70; }
 
   .admin-app { @apply min-h-screen bg-background md:grid md:grid-cols-[232px_minmax(0,1fr)]; }
-  .admin-sidebar { @apply fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 gap-1 border-t bg-card p-2 md:sticky md:inset-auto md:top-0 md:h-screen md:flex md:flex-col md:border-r md:border-t-0 md:p-4; }
+  .admin-sidebar { @apply fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 gap-1 border-t bg-card/95 p-2 shadow-lift backdrop-blur md:sticky md:inset-auto md:top-0 md:h-screen md:flex md:flex-col md:border-r md:border-t-0 md:bg-slate-950 md:p-4 md:text-slate-100; }
   .brand { @apply mb-5 hidden items-center gap-2 px-2 text-lg font-semibold md:flex; }
-  .brand svg { @apply text-primary; }
-  .admin-sidebar button { @apply min-h-12 flex-col justify-center bg-transparent px-2 text-xs text-muted-foreground hover:bg-muted md:min-h-10 md:flex-row md:justify-start md:text-sm; }
-  .admin-sidebar button.active { @apply bg-primary text-primary-foreground hover:bg-primary; }
+  .brand svg { @apply text-amber-300; }
+  .admin-sidebar button { @apply min-h-12 flex-col justify-center bg-transparent px-2 text-xs text-muted-foreground hover:bg-muted md:min-h-10 md:flex-row md:justify-start md:text-sm md:text-slate-400 md:hover:bg-white/10 md:hover:text-white; }
+  .admin-sidebar button.active { @apply bg-primary text-primary-foreground hover:bg-primary md:bg-white md:text-slate-950 md:hover:bg-white; }
   .admin-sidebar .sidebar-link { @apply md:mt-auto; }
   .admin-main { @apply mx-auto w-full max-w-6xl px-3 pb-24 pt-4 md:p-6; }
-  .admin-header { @apply mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between; }
+  .admin-header { @apply mb-5 flex flex-col gap-3 rounded-3xl bg-card/80 p-5 shadow-soft backdrop-blur md:flex-row md:items-start md:justify-between; }
+  .admin-kicker { @apply mb-1 inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary; }
   .admin-header p { @apply m-0 text-sm text-muted-foreground; }
   .refresh-btn { @apply w-full md:w-auto; }
   .admin-stats { @apply mb-5 grid grid-cols-3 gap-2 md:gap-3; }
-  .stat-card { @apply rounded-lg border bg-card p-3 shadow-sm md:flex md:items-center md:gap-3; }
-  .stat-card > span { @apply mb-2 grid size-8 place-items-center rounded-lg bg-primary/10 text-primary md:mb-0; }
-  .stat-card b { @apply block text-xl font-semibold md:text-2xl; }
+  .stat-card { @apply relative overflow-hidden rounded-3xl border-0 bg-card p-4 shadow-soft md:flex md:items-center md:gap-3; }
+  .stat-card:before { content: ''; @apply absolute inset-x-0 top-0 h-1 bg-primary; }
+  .stat-card[data-tone='amber']:before { @apply bg-amber-500; }
+  .stat-card[data-tone='red']:before { @apply bg-rose-500; }
+  .stat-card > span { @apply mb-2 grid size-11 place-items-center rounded-2xl bg-primary/10 text-primary md:mb-0; }
+  .stat-card[data-tone='amber'] > span { @apply bg-amber-100 text-amber-700; }
+  .stat-card[data-tone='red'] > span { @apply bg-rose-100 text-rose-700; }
+  .stat-card b { @apply block text-xl font-bold md:text-2xl; }
   .admin-section { @apply pb-8; }
   .split-layout { @apply grid gap-4 lg:grid-cols-[360px_minmax(0,1fr)]; }
   .row-actions { @apply flex flex-wrap justify-end gap-2; }
+  .item-title-line { @apply flex flex-wrap items-center gap-2; }
+  .item-title-line strong { @apply truncate; }
   .compact-list .admin-item { @apply p-3; }
-  .config-panel, .adjust-form { @apply grid gap-3 rounded-lg border bg-card p-4 shadow-sm; }
+  .config-panel, .adjust-form { @apply grid gap-3 rounded-3xl border-0 bg-card p-4 shadow-soft; }
   .form-pair { @apply grid grid-cols-1 gap-3 sm:grid-cols-2; }
   .field { @apply grid gap-1.5; }
   .field label { @apply text-xs font-medium text-muted-foreground; }
   .checkbox-line { @apply flex items-center gap-2 text-sm text-muted-foreground; }
   .checkbox-line input { @apply size-4 min-h-0 w-4; }
   .icon-picker { @apply grid grid-cols-6 gap-2; }
-  .icon-picker button { @apply min-h-10 bg-secondary p-0 text-lg text-secondary-foreground hover:bg-secondary/80; }
+  .icon-picker button { @apply min-h-11 rounded-2xl bg-secondary p-0 text-lg text-secondary-foreground hover:bg-secondary/80; }
   .icon-picker button.active { @apply ring-2 ring-primary; }
   .adjust-form { @apply mb-1 md:grid-cols-[160px_1fr_auto] md:items-center; }
 
   .login-page { @apply grid min-h-screen place-items-center bg-background p-4; }
-  .login-card { @apply w-full max-w-sm rounded-lg border bg-card p-6 text-center shadow-soft; }
-  .login-icon { @apply mx-auto mb-4 grid size-12 place-items-center rounded-lg bg-primary/10 text-primary; }
+  .login-card { @apply w-full max-w-sm rounded-3xl border-0 bg-card p-7 text-center shadow-lift; }
+  .login-icon { @apply mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-primary/10 text-primary; }
   .login-icon svg { @apply size-6; }
   .login-card input { @apply text-center text-xl tracking-[.45em]; }
   .login-card button { @apply mt-1 w-full; }
   .error-line { @apply min-h-6 pt-1 text-sm text-destructive; }
-  .toast { @apply fixed left-1/2 top-4 z-50 max-w-[calc(100vw-24px)] -translate-x-1/2 truncate rounded-full bg-foreground px-4 py-2 text-sm text-background shadow-soft; }
+  .toast { @apply fixed left-1/2 top-4 z-50 max-w-[calc(100vw-24px)] -translate-x-1/2 truncate rounded-full bg-foreground px-4 py-2 text-sm text-background shadow-lift; animation: toast-in .18s ease-out; }
+  @keyframes toast-in { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
   .ghost-icon { @apply grid size-9 min-h-9 place-items-center rounded-full bg-secondary p-0 text-secondary-foreground hover:bg-secondary/80; }
   .ghost-icon.dark { @apply bg-secondary text-secondary-foreground; }
 
   .modal-backdrop { @apply fixed inset-0 z-40 flex items-end justify-center bg-slate-950/55 p-0 md:items-center md:p-4; }
-  .modal { @apply w-full max-w-md rounded-t-lg border bg-card p-4 shadow-soft md:rounded-lg; }
+  .modal { @apply w-full max-w-md rounded-t-3xl border-0 bg-card p-5 shadow-lift md:rounded-3xl; }
   .modal-head { @apply mb-4 flex items-center justify-between gap-3; }
-  .review-target { @apply mb-4 flex items-center gap-3 rounded-lg bg-muted p-3; }
+  .review-target { @apply mb-4 flex items-center gap-3 rounded-2xl bg-muted p-3; }
   .review-target > span { @apply grid size-10 place-items-center text-2xl; }
   .modal-actions { @apply mt-4 flex justify-end gap-2; }
 
   @media (max-width: 520px) {
+    .child-app { @apply px-2; }
     .hero-balance { @apply text-6xl; }
     .hero-stats { @apply gap-1; }
     .mini-stat { @apply p-2 text-center; }
     .mini-stat span { @apply mx-auto; }
     .activity-grid, .reward-grid { @apply gap-2; }
+    .daily-strip { @apply grid-cols-1; }
+    .date-controls { @apply justify-start; }
+    .date-controls > button { @apply flex-1; }
     .date-panel { @apply flex-col items-stretch; }
     .date-panel label { @apply min-w-0; }
     .admin-item { @apply flex-wrap items-start; }
     .row-actions { @apply w-full justify-stretch; }
     .row-actions button { @apply flex-1; }
+    .admin-header { @apply p-4; }
+    .admin-stats { @apply grid-cols-1; }
   }
 }

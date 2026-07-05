@@ -20,7 +20,8 @@ import {
   RotateCcw,
   Settings,
   ShieldCheck,
-  Star,
+  Sparkles,
+  Target,
   Timer,
   Trophy,
   X,
@@ -49,6 +50,12 @@ async function request(path, options = {}) {
 
 function today() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function offsetDate(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 function asArray(value) {
@@ -140,14 +147,15 @@ function ChildApp({ onAdmin }) {
   const safeTransactions = asArray(transactions);
   const categories = useMemo(() => sortCategories([...new Set(safeActivities.map(a => a.category || '其他'))]), [safeActivities]);
   const filtered = activeCat === '全部' ? safeActivities : safeActivities.filter(a => a.category === activeCat);
-  const todayPending = safeCheckins.filter(c => c.status === 'pending').slice(0, 3);
+  const pendingCheckins = safeCheckins.filter(c => c.status === 'pending');
+  const todayPending = pendingCheckins.slice(0, 3);
 
   if (!verified) return <Login title="欢迎打卡" icon={<ShieldCheck />} pin={pin} setPin={setPin} err={err} onSubmit={login} />;
 
   return <main className="child-app">
     {toast && <Toast>{toast}</Toast>}
     <section className="child-hero">
-      <button className="ghost-icon parent-entry" onClick={onAdmin} title="家长管理"><Settings size={19} /></button>
+      <div className="hero-topline"><span><Sparkles />积分打卡</span><button className="ghost-icon parent-entry" onClick={onAdmin} title="家长管理"><Settings size={19} /></button></div>
       <div className="hero-label">当前积分</div>
       <div className="hero-balance">{summary?.balance ?? 0}</div>
       <div className="hero-stats">
@@ -157,10 +165,15 @@ function ChildApp({ onAdmin }) {
       </div>
     </section>
 
+    <section className="daily-strip">
+      <div><span><Target /></span><strong>{activityDate === today() ? '今日任务' : '补签任务'}</strong><small>{filtered.length} 个项目可选</small></div>
+      <div><span><Clock3 /></span><strong>{pendingCheckins.length}</strong><small>待审核</small></div>
+    </section>
+
     {tab === 'checkin' && <section className="child-page">
       <div className="date-panel">
         <div><strong>{activityDate === today() ? '今天打卡' : '补签打卡'}</strong><span>{formatDateLabel(activityDate)}</span></div>
-        <label><CalendarDays size={17} /><input type="date" value={activityDate} max={today()} onChange={e => setActivityDate(e.target.value)} /></label>
+        <div className="date-controls"><button type="button" className="secondary" onClick={() => setActivityDate(today())}>今天</button><button type="button" className="secondary" onClick={() => setActivityDate(offsetDate(-1))}>昨天</button><label><CalendarDays size={17} /><input type="date" value={activityDate} max={today()} onChange={e => setActivityDate(e.target.value)} /></label></div>
       </div>
 
       {todayPending.length > 0 && <div className="pending-strip">
@@ -168,21 +181,22 @@ function ChildApp({ onAdmin }) {
       </div>}
 
       <Segmented value={activeCat} onChange={setActiveCat} options={['全部', ...categories]} />
-      <div className="activity-grid">{filtered.map(a => <button key={a.id} className="activity-card" onClick={() => submitCheckin(a)} disabled={loadingID === a.id}>
+      {filtered.length ? <div className="activity-grid">{filtered.map(a => <button key={a.id} className="activity-card" data-category={a.category} onClick={() => submitCheckin(a)} disabled={loadingID === a.id}>
         <span className="activity-icon">{loadingID === a.id ? <Loader2 className="spin" /> : iconNode(a.icon)}</span>
+        <span className="activity-category">{a.category}</span>
         <strong>{a.label}</strong>
         <small>{scoreText(a)}</small>
-        <em>{a.category}</em>
-      </button>)}</div>
+        <span className="mode-pill">{modeLabel(a.score_mode)}</span>
+      </button>)}</div> : <EmptyState text="这个分类还没有打卡项" />}
       <SectionTitle icon={<History />} title="最近打卡" />
       <CheckinList items={safeCheckins.slice(0, 8)} />
     </section>}
 
     {tab === 'rewards' && <section className="child-page">
       <SectionTitle icon={<Gift />} title="积分兑换" />
-      <div className="reward-grid">{safeRewards.map(r => <button key={r.id} className="reward-card" onClick={() => redeem(r)}>
-        <span><Gift /></span><strong>{r.name}</strong><small>{r.description || (r.auto_approve ? '自动通过' : '需要审批')}</small><b>{r.cost} 分</b>
-      </button>)}</div>
+      {safeRewards.length ? <div className="reward-grid">{safeRewards.map(r => <button key={r.id} className="reward-card" onClick={() => redeem(r)}>
+        <span><Gift /></span><strong>{r.name}</strong><small>{r.description || (r.auto_approve ? '自动通过' : '需要审批')}</small><div className="reward-footer"><b>{r.cost} 分</b><em>{r.auto_approve ? '自动' : '审批'}</em></div>
+      </button>)}</div> : <EmptyState text="还没有可兑换奖励" />}
       <SectionTitle icon={<ListChecks />} title="兑换记录" />
       <RedemptionList items={safeRedemptions} />
     </section>}
@@ -344,13 +358,13 @@ function AdminApp({ onChild }) {
     </aside>
     <section className="admin-main">
       <header className="admin-header">
-        <div><h1>{tabLabel(tab)}</h1><p>重复打卡和补签会保留原始记录，积分只从流水汇总。</p></div>
+        <div><span className="admin-kicker">家长工作台</span><h1>{tabLabel(tab)}</h1><p>重复打卡和补签会保留原始记录，积分只从流水汇总。</p></div>
         <button className="secondary refresh-btn" onClick={refresh}><RotateCcw size={17} />刷新</button>
       </header>
       <div className="admin-stats">
-        <Stat icon={<Coins />} label="当前积分" value={summary?.balance ?? 0} />
-        <Stat icon={<Timer />} label="今日变动" value={signed(summary?.today_total ?? 0)} />
-        <Stat icon={<ClipboardCheck />} label="待处理" value={(summary?.pending_count ?? 0) + pendingRedemptions.length} />
+        <Stat icon={<Coins />} label="当前积分" value={summary?.balance ?? 0} tone="blue" />
+        <Stat icon={<Timer />} label="今日变动" value={signed(summary?.today_total ?? 0)} tone="amber" />
+        <Stat icon={<ClipboardCheck />} label="待处理" value={(summary?.pending_count ?? 0) + pendingRedemptions.length} tone="red" />
       </div>
 
       {tab === 'review' && <section className="admin-section">
@@ -440,8 +454,8 @@ function MiniStat({ icon, label, value }) {
   return <div className="mini-stat"><span>{icon}</span><div><b>{value}</b><small>{label}</small></div></div>;
 }
 
-function Stat({ icon, label, value }) {
-  return <div className="stat-card"><span>{icon}</span><div><b>{value}</b><small>{label}</small></div></div>;
+function Stat({ icon, label, value, tone = 'blue' }) {
+  return <div className="stat-card" data-tone={tone}><span>{icon}</span><div><b>{value}</b><small>{label}</small></div></div>;
 }
 
 function Segmented({ value, onChange, options }) {
@@ -484,7 +498,7 @@ function AdminCheckins({ items, empty, onApprove, onReject, onReverse }) {
   if (!items.length) return <EmptyState text={empty} />;
   return <div className="admin-list">{items.map(c => <div key={c.id} className="admin-item">
     <span className="record-icon">{iconNode(c.activity_icon)}</span>
-    <div className="admin-item-main"><strong>{c.activity_label}</strong><small>{c.user_name} · {c.activity_date} · {c.source === 'makeup' ? '补签' : '正常'} · {scoreText({ score_mode: c.score_mode, base_points: c.base_points })}</small><StatusBadge value={c.status} /></div>
+    <div className="admin-item-main"><div className="item-title-line"><strong>{c.activity_label}</strong><StatusBadge value={c.status} /></div><small>{c.user_name} · {c.activity_date} · {c.source === 'makeup' ? '补签' : '正常'} · {scoreText({ score_mode: c.score_mode, base_points: c.base_points })}</small></div>
     <div className="row-actions">{c.status === 'pending' && <><button onClick={() => onApprove(c)}><Check size={16} />通过</button><button className="danger" onClick={() => onReject(c)}><X size={16} />驳回</button></>}{c.status === 'approved' && <button className="danger" onClick={() => onReverse(c)}><RotateCcw size={16} />撤回</button>}</div>
   </div>)}</div>;
 }
@@ -494,7 +508,7 @@ function AdminRedemptions({ items, onApprove, onReject }) {
   if (!items.length) return <EmptyState text="暂无待审批兑换" />;
   return <div className="admin-list">{items.map(r => <div key={r.id} className="admin-item">
     <span className="record-icon"><Gift /></span>
-    <div className="admin-item-main"><strong>{r.reward_name}</strong><small>{r.user_name} · {r.cost_at_time} 分</small><StatusBadge value={r.status} /></div>
+    <div className="admin-item-main"><div className="item-title-line"><strong>{r.reward_name}</strong><StatusBadge value={r.status} /></div><small>{r.user_name} · {r.cost_at_time} 分</small></div>
     <div className="row-actions"><button onClick={() => onApprove(r)}><Check size={16} />通过</button><button className="danger" onClick={() => onReject(r)}><X size={16} />驳回</button></div>
   </div>)}</div>;
 }
@@ -564,6 +578,7 @@ function signed(n) { return n > 0 ? `+${n}` : String(n); }
 function status(s) { return { pending: '待审核', approved: '已通过', rejected: '已驳回', reversed: '已撤回', fulfilled: '已完成' }[s] || s; }
 function sourceLabel(s) { return { checkin: '打卡', checkin_reversal: '撤回', redemption: '兑换', adjustment: '调分' }[s] || s; }
 function scoreText(a) { return a.score_mode === 'quality' ? `基础分 ${a.base_points} · 质量` : a.score_mode === 'duration' ? `基础分 ${a.base_points} · 时长` : `基础分 ${a.base_points}`; }
+function modeLabel(mode) { return mode === 'quality' ? '质量审核' : mode === 'duration' ? '按时长' : '固定分'; }
 function iconNode(name) { return ({ book: '📚', read: '📖', pen: '✍️', math: '🔢', note: '📝', voice: '🗣️', letters: '🔤', run: '🏃', bag: '🎒', home: '🏠', music: '🎹', star: '⭐' }[name] || name || '⭐'); }
 function formatTime(value) { return new Date(value.replace(' ', 'T') + 'Z').toLocaleString('zh-CN'); }
 function formatDateLabel(value) { return value === today() ? '今日' : value; }

@@ -18,7 +18,7 @@ export default {
         card: { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' },
       },
       borderRadius: { lg: 'var(--radius)', md: 'calc(var(--radius) - 2px)', sm: 'calc(var(--radius) - 4px)' },
-      boxShadow: { soft: '0 12px 30px rgba(15, 23, 42, .07)' },
+      boxShadow: { soft: '0 14px 34px rgba(15, 23, 42, .08)', lift: '0 24px 60px rgba(15, 23, 42, .14)' },
     },
   },
   plugins: [],
