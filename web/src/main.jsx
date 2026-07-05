@@ -2,25 +2,34 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   Award,
+  Backpack,
   BookOpen,
   CalendarDays,
+  Calculator,
   Check,
   ChevronRight,
   ClipboardCheck,
   Clock3,
   Coins,
+  Dumbbell,
+  FileText,
   Gift,
   History,
   Home,
+  Languages,
   ListChecks,
   Loader2,
   Lock,
+  Mic,
+  Music2,
+  NotebookPen,
   PenLine,
   Plus,
   RotateCcw,
   Settings,
   ShieldCheck,
   Sparkles,
+  Star,
   Target,
   Timer,
   Trophy,
@@ -437,9 +446,10 @@ function Modal({ title, children, onClose }) {
 
 function Login({ title, icon, pin, setPin, err, onSubmit }) {
   return <main className="login-page"><form className="login-card" onSubmit={onSubmit}>
-    <div className="login-icon">{icon}</div>
+    <div className="login-brand"><span className="login-icon">{icon}</span><span>Scorecard</span></div>
     <h1>{title}</h1>
-    <input autoFocus type="password" inputMode="numeric" value={pin} onChange={e => setPin(e.target.value)} placeholder="PIN" />
+    <p>输入 PIN 后继续使用积分打卡。</p>
+    <div className="pin-shell"><Lock size={17} /><input autoFocus type="password" inputMode="numeric" value={pin} onChange={e => setPin(e.target.value)} placeholder="PIN" /></div>
     <div className="error-line">{err}</div>
     <button>进入</button>
   </form></main>;
@@ -514,11 +524,13 @@ function AdminRedemptions({ items, onApprove, onReject }) {
 
 function ActivityForm({ draft, setDraft, onSubmit }) {
   return <form className="config-panel" onSubmit={onSubmit}>
+    <div className="panel-head"><div><strong>{draft.id ? '编辑打卡项' : '新增打卡项'}</strong><small>设置积分规则、分类和展示图标</small></div>{draft.id && <EnabledBadge enabled={draft.enabled} />}</div>
     <div className="field"><label>名称</label><input value={draft.label} onChange={e => setDraft({ ...draft, label: e.target.value })} /></div>
     <div className="form-pair"><div className="field"><label>基础分</label><input type="number" value={draft.base_points} onChange={e => setDraft({ ...draft, base_points: e.target.value })} /></div><div className="field"><label>类型</label><select value={draft.score_mode} onChange={e => setDraft({ ...draft, score_mode: e.target.value })}><option value="default">默认</option><option value="quality">质量</option><option value="duration">时长</option></select></div></div>
     <div className="form-pair"><div className="field"><label>分类</label><input value={draft.category} onChange={e => setDraft({ ...draft, category: e.target.value })} /></div><div className="field"><label>排序</label><input type="number" value={draft.sort_order} onChange={e => setDraft({ ...draft, sort_order: e.target.value })} /></div></div>
     <div className="field"><label>图标</label><IconPicker value={draft.icon} onChange={icon => setDraft({ ...draft, icon })} /></div>
-    <button><Check size={17} />{draft.id ? '保存修改' : '新增打卡项'}</button>
+    {draft.id && <label className="checkbox-line"><input type="checkbox" checked={draft.enabled} onChange={e => setDraft({ ...draft, enabled: e.target.checked })} />启用这个打卡项</label>}
+    <div className="form-actions">{draft.id && <button type="button" className="secondary" onClick={() => setDraft(emptyActivity())}>取消编辑</button>}<button><Check size={17} />{draft.id ? '保存修改' : '新增打卡项'}</button></div>
   </form>;
 }
 
@@ -530,27 +542,33 @@ function IconPicker({ value, onChange }) {
 function ActivityTable({ items, onEdit }) {
   items = asArray(items);
   if (!items.length) return <EmptyState text="暂无打卡项" />;
-  return <div className="admin-list compact-list">{items.map(a => <div key={a.id} className="admin-item"><span className="record-icon">{iconNode(a.icon)}</span><div className="admin-item-main"><strong>{a.label}</strong><small>{a.category} · {scoreText(a)} · {a.enabled ? '启用' : '停用'}</small></div><button className="secondary" onClick={() => onEdit(a)}><PenLine size={16} />编辑</button></div>)}</div>;
+  return <div className="admin-list compact-list">{items.map(a => <div key={a.id} className="admin-item"><span className="record-icon">{iconNode(a.icon)}</span><div className="admin-item-main"><div className="item-title-line"><strong>{a.label}</strong><span className={`badge ${a.enabled ? 'approved' : 'reversed'}`}>{a.enabled ? '启用' : '停用'}</span></div><small>{a.category} · {scoreText(a)} · 排序 {a.sort_order}</small></div><button className="secondary" onClick={() => onEdit(a)}><PenLine size={16} />编辑</button></div>)}</div>;
 }
 
 function RewardForm({ draft, setDraft, onSubmit }) {
   return <form className="config-panel" onSubmit={onSubmit}>
+    <div className="panel-head"><div><strong>{draft.id ? '编辑奖励' : '新增奖励'}</strong><small>配置兑换成本、库存和审批方式</small></div>{draft.id && <EnabledBadge enabled={draft.enabled} />}</div>
     <div className="field"><label>奖励名称</label><input value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} /></div>
     <div className="form-pair"><div className="field"><label>积分</label><input type="number" value={draft.cost} onChange={e => setDraft({ ...draft, cost: e.target.value })} /></div><div className="field"><label>库存</label><input type="number" value={draft.stock} onChange={e => setDraft({ ...draft, stock: e.target.value })} /></div></div>
     <div className="field"><label>描述</label><input value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })} /></div>
     <label className="checkbox-line"><input type="checkbox" checked={draft.auto_approve} onChange={e => setDraft({ ...draft, auto_approve: e.target.checked })} />自动通过</label>
-    <button><Check size={17} />{draft.id ? '保存修改' : '新增奖励'}</button>
+    {draft.id && <label className="checkbox-line"><input type="checkbox" checked={draft.enabled} onChange={e => setDraft({ ...draft, enabled: e.target.checked })} />启用这个奖励</label>}
+    <div className="form-actions">{draft.id && <button type="button" className="secondary" onClick={() => setDraft(emptyReward())}>取消编辑</button>}<button><Check size={17} />{draft.id ? '保存修改' : '新增奖励'}</button></div>
   </form>;
 }
 
 function RewardTable({ items, onEdit }) {
   items = asArray(items);
   if (!items.length) return <EmptyState text="暂无奖励" />;
-  return <div className="admin-list compact-list">{items.map(r => <div key={r.id} className="admin-item"><span className="record-icon"><Gift /></span><div className="admin-item-main"><strong>{r.name}</strong><small>{r.cost} 分 · {r.auto_approve ? '自动通过' : '需审批'} · 库存 {r.stock < 0 ? '无限' : r.stock}</small></div><button className="secondary" onClick={() => onEdit(r)}><PenLine size={16} />编辑</button></div>)}</div>;
+  return <div className="admin-list compact-list">{items.map(r => <div key={r.id} className="admin-item"><span className="record-icon"><Gift /></span><div className="admin-item-main"><div className="item-title-line"><strong>{r.name}</strong><span className={`badge ${r.enabled ? 'approved' : 'reversed'}`}>{r.enabled ? '启用' : '停用'}</span></div><small>{r.cost} 分 · {r.auto_approve ? '自动通过' : '需审批'} · 库存 {r.stock < 0 ? '无限' : r.stock}</small></div><button className="secondary" onClick={() => onEdit(r)}><PenLine size={16} />编辑</button></div>)}</div>;
 }
 
 function StatusBadge({ value }) {
   return <span className={`badge ${value}`}>{status(value)}</span>;
+}
+
+function EnabledBadge({ enabled }) {
+  return <span className={`badge ${enabled ? 'approved' : 'reversed'}`}>{enabled ? '启用' : '停用'}</span>;
 }
 
 function EmptyState({ text }) {
@@ -578,7 +596,22 @@ function status(s) { return { pending: '待审核', approved: '已通过', rejec
 function sourceLabel(s) { return { checkin: '打卡', checkin_reversal: '撤回', redemption: '兑换', adjustment: '调分' }[s] || s; }
 function scoreText(a) { return a.score_mode === 'quality' ? `基础分 ${a.base_points} · 质量` : a.score_mode === 'duration' ? `基础分 ${a.base_points} · 时长` : `基础分 ${a.base_points}`; }
 function modeLabel(mode) { return mode === 'quality' ? '质量审核' : mode === 'duration' ? '按时长' : '固定分'; }
-function iconNode(name) { return ({ book: '📚', read: '📖', pen: '✍️', math: '🔢', note: '📝', voice: '🗣️', letters: '🔤', run: '🏃', bag: '🎒', home: '🏠', music: '🎹', star: '⭐' }[name] || name || '⭐'); }
+function iconNode(name) {
+  return ({
+    book: <BookOpen />,
+    read: <BookOpen />,
+    pen: <PenLine />,
+    math: <Calculator />,
+    note: <NotebookPen />,
+    voice: <Mic />,
+    letters: <Languages />,
+    run: <Dumbbell />,
+    bag: <Backpack />,
+    home: <Home />,
+    music: <Music2 />,
+    star: <Star />,
+  }[name] || (name ? <FileText /> : <Star />));
+}
 function formatTime(value) { return new Date(value.replace(' ', 'T') + 'Z').toLocaleString('zh-CN'); }
 function formatDateLabel(value) { return value === today() ? '今日' : value; }
 function tabLabel(k) { return { review: '审核台', activities: '打卡项', rewards: '奖励', ledger: '积分流水' }[k]; }

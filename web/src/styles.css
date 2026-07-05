@@ -87,7 +87,8 @@
   .activity-card[data-category='才艺']:before { @apply bg-fuchsia-500; }
   .activity-card strong { @apply mt-4 text-lg font-bold; }
   .activity-category { @apply absolute right-3 top-3 rounded-full bg-secondary/80 px-2 py-0.5 text-xs text-muted-foreground; }
-  .activity-icon { @apply grid size-12 place-items-center rounded-2xl bg-primary/10 text-2xl text-primary; }
+  .activity-icon { @apply grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary; }
+  .activity-icon svg { @apply size-6; }
   .mode-pill { @apply mt-auto rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground; }
 
   .reward-grid { @apply grid grid-cols-2 gap-3; }
@@ -107,7 +108,8 @@
   .section-title em { @apply ml-auto text-xs not-italic text-muted-foreground; }
   .record-list, .admin-list { @apply grid gap-2; }
   .record-row, .admin-item { @apply flex min-w-0 items-center gap-3 rounded-2xl border bg-card p-3 shadow-sm; }
-  .record-icon { @apply grid size-10 shrink-0 place-items-center rounded-2xl bg-secondary text-lg text-primary; }
+  .record-icon { @apply grid size-10 shrink-0 place-items-center rounded-2xl bg-secondary text-primary; }
+  .record-icon svg { @apply size-5; }
   .record-main, .admin-item-main { @apply min-w-0 flex-1; }
   .record-main strong, .admin-item-main strong { @apply block truncate text-sm font-medium; }
   .record-row b { @apply ml-auto whitespace-nowrap text-sm font-semibold; }
@@ -149,22 +151,33 @@
   .item-title-line strong { @apply truncate; }
   .compact-list .admin-item { @apply p-3; }
   .config-panel, .adjust-form { @apply grid gap-3 rounded-3xl border-0 bg-card p-4 shadow-soft; }
+  .panel-head { @apply -mx-1 mb-1 flex items-start justify-between gap-3 rounded-2xl bg-muted/60 p-3; }
+  .panel-head strong { @apply block text-sm font-semibold; }
+  .panel-head small { @apply mt-0.5; }
   .form-pair { @apply grid grid-cols-1 gap-3 sm:grid-cols-2; }
   .field { @apply grid gap-1.5; }
   .field label { @apply text-xs font-medium text-muted-foreground; }
   .checkbox-line { @apply flex items-center gap-2 text-sm text-muted-foreground; }
   .checkbox-line input { @apply size-4 min-h-0 w-4; }
+  .form-actions { @apply grid grid-cols-1 gap-2 sm:flex sm:justify-end; }
+  .form-actions button { @apply w-full sm:w-auto; }
   .icon-picker { @apply grid grid-cols-6 gap-2; }
   .icon-picker button { @apply min-h-11 rounded-2xl bg-secondary p-0 text-lg text-secondary-foreground hover:bg-secondary/80; }
   .icon-picker button.active { @apply ring-2 ring-primary; }
   .adjust-form { @apply mb-1 md:grid-cols-[160px_1fr_auto] md:items-center; }
 
   .login-page { @apply grid min-h-screen place-items-center bg-background p-4; }
-  .login-card { @apply w-full max-w-sm rounded-3xl border-0 bg-card p-7 text-center shadow-lift; }
-  .login-icon { @apply mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-primary/10 text-primary; }
-  .login-icon svg { @apply size-6; }
-  .login-card input { @apply text-center text-xl tracking-[.45em]; }
-  .login-card button { @apply mt-1 w-full; }
+  .login-card { @apply relative w-full max-w-sm overflow-hidden rounded-3xl border-0 bg-card p-7 text-left shadow-lift; }
+  .login-card:before { content: ''; @apply absolute inset-x-0 top-0 h-1.5 bg-primary; }
+  .login-brand { @apply mb-7 flex items-center gap-2 text-sm font-semibold text-muted-foreground; }
+  .login-icon { @apply grid size-11 place-items-center rounded-2xl bg-primary/10 text-primary; }
+  .login-icon svg { @apply size-5; }
+  .login-card h1 { @apply mb-1 text-3xl; }
+  .login-card p { @apply m-0 mb-5 text-sm text-muted-foreground; }
+  .pin-shell { @apply flex items-center gap-2 rounded-2xl border bg-background px-3 transition focus-within:ring-2 focus-within:ring-ring/25; }
+  .pin-shell svg { @apply text-muted-foreground; }
+  .pin-shell input { @apply h-12 border-0 bg-transparent px-0 text-center text-xl tracking-[.45em] focus:ring-0; }
+  .login-card button { @apply mt-1 w-full min-h-11; }
   .error-line { @apply min-h-6 pt-1 text-sm text-destructive; }
   .toast { @apply fixed left-1/2 top-4 z-50 max-w-[calc(100vw-24px)] -translate-x-1/2 truncate rounded-full bg-foreground px-4 py-2 text-sm text-background shadow-lift; animation: toast-in .18s ease-out; }
   @keyframes toast-in { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
@@ -175,7 +188,8 @@
   .modal { @apply w-full max-w-md rounded-t-3xl border-0 bg-card p-5 shadow-lift md:rounded-3xl; }
   .modal-head { @apply mb-4 flex items-center justify-between gap-3; }
   .review-target { @apply mb-4 flex items-center gap-3 rounded-2xl bg-muted p-3; }
-  .review-target > span { @apply grid size-10 place-items-center text-2xl; }
+  .review-target > span { @apply grid size-10 place-items-center rounded-2xl bg-card text-primary; }
+  .review-target > span svg { @apply size-5; }
   .modal-actions { @apply mt-4 flex justify-end gap-2; }
 
   @media (max-width: 520px) {
