@@ -154,10 +154,27 @@ function ChildApp({ onAdmin }) {
   const safeRewards = asArray(rewards);
   const safeRedemptions = asArray(redemptions);
   const safeTransactions = asArray(transactions);
+  const balance = summary?.balance ?? 0;
   const categories = useMemo(() => sortCategories([...new Set(safeActivities.map(a => a.category || '其他'))]), [safeActivities]);
   const filtered = activeCat === '全部' ? safeActivities : safeActivities.filter(a => a.category === activeCat);
   const pendingCheckins = safeCheckins.filter(c => c.status === 'pending');
   const todayPending = pendingCheckins.slice(0, 3);
+  const dateCheckinCounts = useMemo(() => {
+    const counts = new Map();
+    safeCheckins.forEach(c => {
+      if (c.activity_date !== activityDate || c.status === 'rejected' || c.status === 'reversed') return;
+      counts.set(c.activity_id, (counts.get(c.activity_id) || 0) + 1);
+    });
+    return counts;
+  }, [safeCheckins, activityDate]);
+  const submittedOnDate = [...dateCheckinCounts.values()].reduce((sum, n) => sum + n, 0);
+  const sortedRewards = useMemo(() => [...safeRewards].sort((a, b) => a.cost - b.cost), [safeRewards]);
+  const targetReward = sortedRewards.find(r => r.cost > balance) || sortedRewards[sortedRewards.length - 1] || null;
+  const targetProgress = targetReward ? Math.min(100, Math.round((balance / Math.max(targetReward.cost, 1)) * 100)) : 0;
+  const approvedCheckins = safeCheckins.filter(c => c.status === 'approved');
+  const fulfilledRedemptions = safeRedemptions.filter(r => r.status === 'fulfilled');
+  const earnedTotal = safeTransactions.filter(t => t.change > 0).reduce((sum, t) => sum + t.change, 0);
+  const spentTotal = Math.abs(safeTransactions.filter(t => t.change < 0).reduce((sum, t) => sum + t.change, 0));
 
   if (!verified) return <Login title="欢迎打卡" icon={<ShieldCheck />} pin={pin} setPin={setPin} err={err} onSubmit={login} />;
 
@@ -175,6 +192,11 @@ function ChildApp({ onAdmin }) {
         </div>
       </section>
 
+      <section className="goal-card">
+        <div className="goal-head"><span><Trophy /></span><div><strong>{targetReward ? '下一个小目标' : '今天从小任务开始'}</strong><small>{targetReward ? targetReward.name : '完成打卡后这里会出现奖励进度'}</small></div></div>
+        {targetReward ? <><div className="goal-progress"><i style={{ width: `${targetProgress}%` }} /></div><div className="goal-foot"><b>{balance}/{targetReward.cost} 分</b><button type="button" className="tiny-action" onClick={() => setTab('rewards')}>{balance >= targetReward.cost ? '去兑换' : `还差 ${targetReward.cost - balance} 分`}</button></div></> : <button type="button" className="tiny-action wide" onClick={() => setTab('checkin')}>开始打卡</button>}
+      </section>
+
       <nav className="bottom-nav">
         <button className={tab === 'checkin' ? 'active' : ''} onClick={() => setTab('checkin')}><ClipboardCheck />打卡</button>
         <button className={tab === 'rewards' ? 'active' : ''} onClick={() => setTab('rewards')}><Gift />奖励</button>
@@ -185,7 +207,7 @@ function ChildApp({ onAdmin }) {
     {tab === 'checkin' && <section className="child-page">
       <div className="daily-strip">
         <div><span><Target /></span><strong>{activityDate === today() ? '今日任务' : '补签任务'}</strong><small>{filtered.length} 个项目可选</small></div>
-        <div><span><Clock3 /></span><strong>{pendingCheckins.length}</strong><small>待审核</small></div>
+        <div><span><Check /></span><strong>{submittedOnDate}</strong><small>{activityDate === today() ? '今日已提交' : '这天已提交'}</small></div>
       </div>
       <div className="date-panel">
         <div><strong>{activityDate === today() ? '今天打卡' : '补签打卡'}</strong><span>{formatDateLabel(activityDate)}</span></div>
@@ -197,27 +219,41 @@ function ChildApp({ onAdmin }) {
       </div>}
 
       <Segmented value={activeCat} onChange={setActiveCat} options={['全部', ...categories]} />
-      {filtered.length ? <div className="activity-grid">{filtered.map(a => <button key={a.id} className="activity-card" data-category={a.category} onClick={() => submitCheckin(a)} disabled={loadingID === a.id}>
-        <span className="activity-icon">{loadingID === a.id ? <Loader2 className="spin" /> : iconNode(a.icon)}</span>
-        <span className="activity-category">{a.category}</span>
-        <strong>{a.label}</strong>
-        <small>{scoreText(a)}</small>
-        <span className="mode-pill">{modeLabel(a.score_mode)}</span>
-      </button>)}</div> : <EmptyState text="这个分类还没有打卡项" />}
+      {filtered.length ? <div className="activity-grid">{filtered.map(a => {
+        const submittedCount = dateCheckinCounts.get(a.id) || 0;
+        return <button key={a.id} className="activity-card" data-category={a.category} data-submitted={submittedCount > 0 ? 'yes' : 'no'} onClick={() => submitCheckin(a)} disabled={loadingID === a.id}>
+          {submittedCount > 0 && <span className="submitted-ribbon"><Check />已提交{submittedCount > 1 ? ` ${submittedCount}` : ''}</span>}
+          <span className="activity-icon">{loadingID === a.id ? <Loader2 className="spin" /> : iconNode(a.icon)}</span>
+          <span className="activity-category">{a.category}</span>
+          <strong>{a.label}</strong>
+          <small>{scoreText(a)}</small>
+          <span className="mode-pill">{modeLabel(a.score_mode)}</span>
+        </button>;
+      })}</div> : <EmptyState icon={<Target />} title="这个分类还没有任务" text="换个分类看看，或请家长添加新的学习打卡项" />}
       <SectionTitle icon={<History />} title="最近打卡" />
       <CheckinList items={safeCheckins.slice(0, 8)} />
     </section>}
 
     {tab === 'rewards' && <section className="child-page">
       <SectionTitle icon={<Gift />} title="积分兑换" />
-      {safeRewards.length ? <div className="reward-grid">{safeRewards.map(r => <button key={r.id} className="reward-card" onClick={() => redeem(r)}>
-        <span><Gift /></span><strong>{r.name}</strong><small>{r.description || (r.auto_approve ? '自动通过' : '需要审批')}</small><div className="reward-footer"><b>{r.cost} 分</b><em>{r.auto_approve ? '自动' : '审批'}</em></div>
-      </button>)}</div> : <EmptyState text="还没有可兑换奖励" />}
+      {safeRewards.length ? <div className="reward-grid">{safeRewards.map(r => {
+        const canRedeem = balance >= r.cost;
+        const progress = Math.min(100, Math.round((balance / Math.max(r.cost, 1)) * 100));
+        return <button key={r.id} className="reward-card" data-ready={canRedeem ? 'yes' : 'no'} onClick={() => redeem(r)}>
+          <span className="reward-icon"><Gift /></span><strong>{r.name}</strong><small>{r.description || (r.auto_approve ? '自动通过' : '需要审批')}</small><div className="reward-progress"><i style={{ width: `${progress}%` }} /></div><div className="reward-footer"><b>{r.cost} 分</b><em>{canRedeem ? '可兑换' : `差 ${r.cost - balance} 分`}</em></div>
+        </button>;
+      })}</div> : <EmptyState icon={<Gift />} title="奖励货架还是空的" text="请家长添加几个想兑换的小奖励" />}
       <SectionTitle icon={<ListChecks />} title="兑换记录" />
       <RedemptionList items={safeRedemptions} />
     </section>}
 
     {tab === 'records' && <section className="child-page">
+      <div className="growth-board">
+        <div><span><ClipboardCheck /></span><strong>{approvedCheckins.length}</strong><small>已通过打卡</small></div>
+        <div><span><Sparkles /></span><strong>{earnedTotal}</strong><small>累计获得</small></div>
+        <div><span><Gift /></span><strong>{fulfilledRedemptions.length}</strong><small>完成兑换</small></div>
+        <div><span><Coins /></span><strong>{spentTotal}</strong><small>已使用积分</small></div>
+      </div>
       <SectionTitle icon={<History />} title="积分流水" />
       <TransactionList items={safeTransactions} />
     </section>}
@@ -379,6 +415,10 @@ function AdminApp({ onChild }) {
       </div>
 
       {tab === 'review' && <section className="admin-section">
+        <div className="review-board">
+          <div><span><ClipboardCheck /></span><strong>{pendingCheckins.length}</strong><small>打卡待审核</small></div>
+          <div><span><Gift /></span><strong>{pendingRedemptions.length}</strong><small>兑换待审批</small></div>
+        </div>
         <SectionTitle icon={<ClipboardCheck />} title="打卡审核" aside={`${pendingCheckins.length} 条待处理`} />
         <AdminCheckins items={pendingCheckins} empty="暂无待审核打卡" onApprove={setReviewing} onReject={setRejecting} />
         <SectionTitle icon={<Gift />} title="兑换审批" aside={`${pendingRedemptions.length} 条待处理`} />
@@ -480,20 +520,20 @@ function Segmented({ value, onChange, options }) {
 
 function CheckinList({ items }) {
   items = asArray(items);
-  if (!items.length) return <EmptyState text="暂无打卡记录" />;
-  return <div className="record-list">{items.map(c => <RecordRow key={c.id} icon={iconNode(c.activity_icon)} title={c.activity_label} meta={`${c.activity_date} · ${status(c.status)} · ${c.source === 'makeup' ? '补签' : '正常'}`} value={c.awarded_points + c.streak_bonus || '-'} badge={c.source === 'makeup' ? '补签' : null} />)}</div>;
+  if (!items.length) return <EmptyState icon={<ClipboardCheck />} title="还没有打卡记录" text="完成一个任务后，这里会留下成长轨迹" />;
+  return <div className="record-list timeline-list">{items.map(c => <RecordRow key={c.id} icon={iconNode(c.activity_icon)} title={c.activity_label} meta={`${c.activity_date} · ${status(c.status)} · ${c.source === 'makeup' ? '补签' : '正常'}`} value={c.status === 'approved' ? signed((c.awarded_points || 0) + (c.streak_bonus || 0)) : status(c.status)} tone={c.status === 'approved' ? 'positive' : c.status} badge={c.source === 'makeup' ? '补签' : null} />)}</div>;
 }
 
 function RedemptionList({ items }) {
   items = asArray(items);
-  if (!items.length) return <EmptyState text="暂无兑换记录" />;
-  return <div className="record-list">{items.map(r => <RecordRow key={r.id} icon={<Gift />} title={r.reward_name} meta={status(r.status)} value={`${r.cost_at_time}分`} />)}</div>;
+  if (!items.length) return <EmptyState icon={<Gift />} title="还没有兑换记录" text="攒够积分后，可以在这里看到兑换进展" />;
+  return <div className="record-list timeline-list">{items.map(r => <RecordRow key={r.id} icon={<Gift />} title={r.reward_name} meta={status(r.status)} value={`-${r.cost_at_time}`} tone={r.status === 'fulfilled' ? 'negative' : r.status} />)}</div>;
 }
 
 function TransactionList({ items }) {
   items = asArray(items);
-  if (!items.length) return <EmptyState text="暂无积分流水" />;
-  return <div className="record-list">{items.map(t => <RecordRow key={t.id} icon={t.change > 0 ? <Plus /> : <ChevronRight />} title={t.reason} meta={`${formatTime(t.created_at)} · ${sourceLabel(t.source_type)}`} value={signed(t.change)} tone={t.change > 0 ? 'positive' : 'negative'} />)}</div>;
+  if (!items.length) return <EmptyState icon={<Coins />} title="还没有积分流水" text="通过审核、兑换奖励和手工调分都会记录在这里" />;
+  return <div className="record-list timeline-list">{items.map(t => <RecordRow key={t.id} icon={t.change > 0 ? <Plus /> : <ChevronRight />} title={t.reason} meta={`${formatTime(t.created_at)} · ${sourceLabel(t.source_type)}`} value={signed(t.change)} tone={t.change > 0 ? 'positive' : 'negative'} />)}</div>;
 }
 
 function RecordRow({ icon, title, meta, value, tone, badge }) {
@@ -507,7 +547,7 @@ function RecordRow({ icon, title, meta, value, tone, badge }) {
 
 function AdminCheckins({ items, empty, onApprove, onReject, onReverse }) {
   items = asArray(items);
-  if (!items.length) return <EmptyState text={empty} />;
+  if (!items.length) return <EmptyState icon={<ClipboardCheck />} title={empty} text="新的打卡提交会出现在这里" />;
   return <div className="admin-list">{items.map(c => <div key={c.id} className="admin-item">
     <span className="record-icon">{iconNode(c.activity_icon)}</span>
     <div className="admin-item-main"><div className="item-title-line"><strong>{c.activity_label}</strong><StatusBadge value={c.status} /></div><small>{c.user_name} · {c.activity_date} · {c.source === 'makeup' ? '补签' : '正常'} · {scoreText({ score_mode: c.score_mode, base_points: c.base_points })}</small></div>
@@ -517,7 +557,7 @@ function AdminCheckins({ items, empty, onApprove, onReject, onReverse }) {
 
 function AdminRedemptions({ items, onApprove, onReject }) {
   items = asArray(items);
-  if (!items.length) return <EmptyState text="暂无待审批兑换" />;
+  if (!items.length) return <EmptyState icon={<Gift />} title="暂无待审批兑换" text="孩子提交兑换后会出现在这里" />;
   return <div className="admin-list">{items.map(r => <div key={r.id} className="admin-item">
     <span className="record-icon"><Gift /></span>
     <div className="admin-item-main"><div className="item-title-line"><strong>{r.reward_name}</strong><StatusBadge value={r.status} /></div><small>{r.user_name} · {r.cost_at_time} 分</small></div>
@@ -544,7 +584,7 @@ function IconPicker({ value, onChange }) {
 
 function ActivityTable({ items, onEdit }) {
   items = asArray(items);
-  if (!items.length) return <EmptyState text="暂无打卡项" />;
+  if (!items.length) return <EmptyState icon={<BookOpen />} title="暂无打卡项" text="先添加几个每天要完成的小任务" />;
   return <div className="admin-list compact-list">{items.map(a => <div key={a.id} className="admin-item"><span className="record-icon">{iconNode(a.icon)}</span><div className="admin-item-main"><div className="item-title-line"><strong>{a.label}</strong><span className={`badge ${a.enabled ? 'approved' : 'reversed'}`}>{a.enabled ? '启用' : '停用'}</span></div><small>{a.category} · {scoreText(a)} · 排序 {a.sort_order}</small></div><button className="secondary" onClick={() => onEdit(a)}><PenLine size={16} />编辑</button></div>)}</div>;
 }
 
@@ -562,7 +602,7 @@ function RewardForm({ draft, setDraft, onSubmit }) {
 
 function RewardTable({ items, onEdit }) {
   items = asArray(items);
-  if (!items.length) return <EmptyState text="暂无奖励" />;
+  if (!items.length) return <EmptyState icon={<Gift />} title="暂无奖励" text="添加奖励后，孩子端会出现兑换货架" />;
   return <div className="admin-list compact-list">{items.map(r => <div key={r.id} className="admin-item"><span className="record-icon"><Gift /></span><div className="admin-item-main"><div className="item-title-line"><strong>{r.name}</strong><span className={`badge ${r.enabled ? 'approved' : 'reversed'}`}>{r.enabled ? '启用' : '停用'}</span></div><small>{r.cost} 分 · {r.auto_approve ? '自动通过' : '需审批'} · 库存 {r.stock < 0 ? '无限' : r.stock}</small></div><button className="secondary" onClick={() => onEdit(r)}><PenLine size={16} />编辑</button></div>)}</div>;
 }
 
@@ -574,8 +614,8 @@ function EnabledBadge({ enabled }) {
   return <span className={`badge ${enabled ? 'approved' : 'reversed'}`}>{enabled ? '启用' : '停用'}</span>;
 }
 
-function EmptyState({ text }) {
-  return <div className="empty-state"><ListChecks /><span>{text}</span></div>;
+function EmptyState({ icon, title, text }) {
+  return <div className="empty-state"><span>{icon || <ListChecks />}</span><strong>{title || text}</strong>{text && title && <small>{text}</small>}</div>;
 }
 
 function Toast({ children }) {
