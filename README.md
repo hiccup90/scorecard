@@ -39,10 +39,11 @@ docker compose up -d --build
 
 数据文件：`./data/scorecard.db`（备份只需拷贝该文件及相关 `-wal`/`-shm`）。
 
-容器默认用户 `uid=10001`。若宿主机 `./data` 权限不足：
+容器入口会以 root 校正 `./data` 属主后降权为 `appuser (10001)`。若仍报 `readonly database`：
 
 ```bash
 sudo chown -R 10001:10001 ./data
+docker compose up -d --build
 ```
 
 ## 常用命令

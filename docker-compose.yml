@@ -8,6 +8,7 @@ services:
     ports:
       - "3003:3003"
     volumes:
+      # Host ./data is chowned by entrypoint (starts as root → appuser) for SQLite/WAL.
       - ./data:/app/data
     environment:
       PORT: "3003"

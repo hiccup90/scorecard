@@ -1,5 +1,31 @@
 # Runbook
 
+## Readonly database / migrate failed
+
+`attempt to write a readonly database` is almost always **directory permissions**, not schema breakage.
+
+SQLite needs write access to the **folder** (for WAL: `*.db-wal`, `*.db-shm`), not only the `.db` file.
+
+**Docker compose (mounted `./data`):**
+
+```bash
+# after pull/rebuild — entrypoint should auto-chown; if still failing:
+sudo chown -R 10001:10001 ./data
+# or match your host user
+sudo chown -R "$(id -u):$(id -g)" ./data
+docker compose up -d --build
+```
+
+**Local binary:**
+
+```bash
+mkdir -p ./data
+# ensure current user owns it
+chown -R "$(id -u):$(id -g)" ./data
+```
+
+Old DBs from previous versions remain compatible: migrations mark v1 applied if tables already exist.
+
 ## Backup (SQLite)
 
 Stop writes briefly if possible, then:

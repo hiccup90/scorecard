@@ -21,12 +21,17 @@ func Open(path string, loc *time.Location) (*DB, error) {
 	if loc == nil {
 		loc = time.Local
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, fmt.Errorf("create db dir %s: %w (check permissions)", dir, err)
+	}
+	// Probe writability early (SQLite WAL needs create rights in the directory).
+	if err := ensureWritableDir(dir); err != nil {
 		return nil, err
 	}
 
 	// SQLite: foreign keys, busy timeout, WAL applied in migrate.Up
-	db, err := sql.Open("sqlite3", path+"?_foreign_keys=on&_busy_timeout=5000")
+	db, err := sql.Open("sqlite3", path+"?_foreign_keys=on&_busy_timeout=5000&_journal_mode=WAL")
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +42,7 @@ func Open(path string, loc *time.Location) (*DB, error) {
 
 	if err := migrate.Up(db); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("migrate: %w", err)
+		return nil, fmt.Errorf("migrate %s: %w (if readonly: chown the data directory so the process can write)", path, err)
 	}
 
 	wrapped := &DB{DB: db, Loc: loc}
@@ -111,4 +116,15 @@ func (db *DB) Now() time.Time {
 
 func (db *DB) Ping() error {
 	return db.DB.Ping()
+}
+
+func ensureWritableDir(dir string) error {
+	probe := filepath.Join(dir, ".scorecard-write-test")
+	f, err := os.OpenFile(probe, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("database directory not writable: %s (%w). Fix: chown/chmod the directory (Docker: sudo chown -R 10001:10001 ./data or rebuild with entrypoint)", dir, err)
+	}
+	_ = f.Close()
+	_ = os.Remove(probe)
+	return nil
 }
