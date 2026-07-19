@@ -85,6 +85,63 @@ func (s *Server) handleCheckins(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) handleCheckinByID(w http.ResponseWriter, r *http.Request) {
+	// /api/v1/checkins/{id}/cancel
+	parts := strings.Split(strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/v1/checkins/"), "/"), "/")
+	if len(parts) != 2 || parts[1] != "cancel" {
+		writeError(w, http.StatusNotFound, "接口不存在")
+		return
+	}
+	id, ok := parseID(w, parts[0])
+	if !ok {
+		return
+	}
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+	s.cancelCheckin(w, r, id)
+}
+
+func (s *Server) cancelCheckin(w http.ResponseWriter, r *http.Request, id int64) {
+	sess := sessionFrom(r)
+	userID := int64(1)
+	if sess.Role == "child" {
+		userID = sess.UserID
+	}
+	// Child can cancel own pending; parent can cancel any pending for child.
+	var owner int64
+	var status string
+	err := s.db.QueryRow(`SELECT user_id, status FROM checkins WHERE id=?`, id).Scan(&owner, &status)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "打卡不存在")
+		return
+	}
+	if status != "pending" {
+		writeError(w, http.StatusBadRequest, "只能取消待审核打卡")
+		return
+	}
+	if sess.Role == "child" && owner != userID {
+		writeError(w, http.StatusForbidden, "无权取消")
+		return
+	}
+	if sess.Role == "parent" {
+		userID = owner
+	}
+	res, err := s.db.Exec(`UPDATE checkins SET status='rejected', review_note=?, reviewed_at=CURRENT_TIMESTAMP, reviewed_by=? WHERE id=? AND status='pending'`,
+		"用户取消", sess.UserID, id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		writeError(w, http.StatusBadRequest, "只能取消待审核打卡")
+		return
+	}
+	auditDB(s.db.DB, sess.UserID, "checkin.cancel", "checkin", id, "用户取消")
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
 func (s *Server) handleAdminCheckins(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		methodNotAllowed(w)

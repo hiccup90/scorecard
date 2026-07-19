@@ -2,9 +2,11 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/hiccup90/scorecard/internal/domain"
 )
@@ -68,3 +70,30 @@ func nullableInt(v int) interface{} {
 
 func min(a, b int) int { return domain.Min(a, b) }
 func max(a, b int) int { return domain.Max(a, b) }
+
+// localOffsetSQL returns a SQLite datetime modifier like '+8 hours' for the location.
+func localOffsetSQL(loc *time.Location) string {
+	if loc == nil {
+		loc = time.Local
+	}
+	_, offset := time.Now().In(loc).Zone()
+	hours := offset / 3600
+	mins := (offset % 3600) / 60
+	if mins < 0 {
+		mins = -mins
+	}
+	if mins == 0 {
+		if hours >= 0 {
+			return fmt.Sprintf("+%d hours", hours)
+		}
+		return fmt.Sprintf("%d hours", hours)
+	}
+	sign := "+"
+	if hours < 0 || offset < 0 {
+		sign = "-"
+		if hours < 0 {
+			hours = -hours
+		}
+	}
+	return fmt.Sprintf("%s%d hours, %s%d minutes", sign, hours, sign, mins)
+}

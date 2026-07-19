@@ -63,8 +63,35 @@ func (s *Server) handleAdminRewards(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAdminRewardByID(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(w, strings.TrimPrefix(r.URL.Path, "/api/v1/admin/rewards/"))
+	rest := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/v1/admin/rewards/"), "/")
+	parts := strings.Split(rest, "/")
+	if len(parts) == 0 || parts[0] == "" {
+		writeError(w, http.StatusNotFound, "接口不存在")
+		return
+	}
+	id, ok := parseID(w, parts[0])
 	if !ok {
+		return
+	}
+	if len(parts) == 2 && parts[1] == "restore" {
+		if r.Method != http.MethodPost {
+			methodNotAllowed(w)
+			return
+		}
+		res, err := s.db.Exec(`UPDATE rewards SET enabled=1 WHERE id=?`, id)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			writeError(w, http.StatusNotFound, "奖励不存在")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		return
+	}
+	if len(parts) != 1 {
+		writeError(w, http.StatusNotFound, "接口不存在")
 		return
 	}
 	switch r.Method {

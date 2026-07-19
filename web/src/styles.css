@@ -197,6 +197,10 @@
   .icon-preview-mark { @apply flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-secondary-foreground; }
   .icon-preview strong { @apply block text-sm; }
   .icon-preview small { @apply text-muted-foreground; }
+  .hero-actions { @apply flex items-center gap-1; }
+  .record-row-wrap { @apply space-y-1; }
+  .tiny-row-action { @apply ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-xs; }
+  .danger-link { @apply text-destructive; }
   .form-pair { @apply grid grid-cols-1 gap-3 sm:grid-cols-2; }
   .field { @apply grid gap-1.5; }
   .field label { @apply text-xs font-medium text-muted-foreground; }

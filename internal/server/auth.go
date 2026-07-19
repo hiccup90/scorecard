@@ -104,6 +104,18 @@ func (s *Server) handleVerify(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "role": sess.Role, "user_id": sess.UserID})
 }
 
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+	token := r.Header.Get("X-Auth-Token")
+	if token != "" {
+		_, _ = s.db.Exec(`DELETE FROM sessions WHERE token=?`, token)
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
 func (s *Server) createSession(userID int64, role string) (string, error) {
 	token, err := newToken()
 	if err != nil {

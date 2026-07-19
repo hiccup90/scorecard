@@ -125,21 +125,27 @@ function RecordRow({ icon, title, meta, value, tone, badge }) {
   );
 }
 
-export function CheckinList({ items }) {
+export function CheckinList({ items, onCancel }) {
   const list = asArray(items);
   if (!list.length) return <EmptyState icon={<ClipboardCheck />} title="还没有打卡记录" text="完成一个任务后，这里会留下成长轨迹" />;
   return (
     <div className="record-list timeline-list">
       {list.map((c) => (
-        <RecordRow
-          key={c.id}
-          icon={iconNode(c.activity_icon)}
-          title={c.activity_label}
-          meta={`${c.activity_date} · ${status(c.status)} · ${c.source === 'makeup' ? '补签' : '正常'}`}
-          value={c.status === 'approved' ? signed((c.awarded_points || 0) + (c.streak_bonus || 0)) : status(c.status)}
-          tone={c.status === 'approved' ? 'positive' : c.status}
-          badge={c.source === 'makeup' ? '补签' : null}
-        />
+        <div key={c.id} className="record-row-wrap">
+          <RecordRow
+            icon={iconNode(c.activity_icon)}
+            title={c.activity_label}
+            meta={`${c.activity_date} · ${status(c.status)} · ${c.source === 'makeup' ? '补签' : '正常'}`}
+            value={c.status === 'approved' ? signed((c.awarded_points || 0) + (c.streak_bonus || 0)) : status(c.status)}
+            tone={c.status === 'approved' ? 'positive' : c.status}
+            badge={c.source === 'makeup' ? '补签' : null}
+          />
+          {c.status === 'pending' && onCancel && (
+            <button type="button" className="danger tiny-row-action" onClick={() => onCancel(c)}>
+              <X size={14} />取消
+            </button>
+          )}
+        </div>
       ))}
     </div>
   );
@@ -363,7 +369,7 @@ export function ActivityForm({ draft, setDraft, onSubmit }) {
   );
 }
 
-export function ActivityTable({ items, onEdit, onDelete }) {
+export function ActivityTable({ items, onEdit, onDelete, onRestore }) {
   const list = asArray(items);
   if (!list.length) return <EmptyState icon={<BookOpen />} title="暂无打卡项" text="先添加几个每天要完成的小任务" />;
   return (
@@ -382,6 +388,9 @@ export function ActivityTable({ items, onEdit, onDelete }) {
             <button type="button" className="secondary" onClick={() => onEdit(a)}><PenLine size={16} />编辑</button>
             {a.enabled && onDelete && (
               <button type="button" className="danger" onClick={() => onDelete(a)}><X size={16} />删除</button>
+            )}
+            {!a.enabled && onRestore && (
+              <button type="button" onClick={() => onRestore(a)}><RotateCcw size={16} />恢复</button>
             )}
           </div>
         </div>
@@ -424,7 +433,7 @@ export function RewardForm({ draft, setDraft, onSubmit }) {
   );
 }
 
-export function RewardTable({ items, onEdit, onDelete }) {
+export function RewardTable({ items, onEdit, onDelete, onRestore }) {
   const list = asArray(items);
   if (!list.length) return <EmptyState icon={<Gift />} title="暂无奖励" text="添加奖励后，孩子端会出现兑换货架" />;
   return (
@@ -443,6 +452,9 @@ export function RewardTable({ items, onEdit, onDelete }) {
             <button type="button" className="secondary" onClick={() => onEdit(r)}><PenLine size={16} />编辑</button>
             {r.enabled && onDelete && (
               <button type="button" className="danger" onClick={() => onDelete(r)}><X size={16} />删除</button>
+            )}
+            {!r.enabled && onRestore && (
+              <button type="button" onClick={() => onRestore(r)}><RotateCcw size={16} />恢复</button>
             )}
           </div>
         </div>

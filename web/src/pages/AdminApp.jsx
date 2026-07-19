@@ -10,12 +10,13 @@ import {
   Home,
   ListChecks,
   Lock,
+  LogOut,
   PenLine,
   RotateCcw,
   ShieldCheck,
   Timer,
 } from 'lucide-react';
-import { api, getParentToken, hasParentSession, setParentToken } from '../api/client';
+import { api, clearParentSession, getParentToken, hasParentSession, setParentToken } from '../api/client';
 import {
   ActivityForm,
   ActivityTable,
@@ -135,6 +136,12 @@ export default function AdminApp({ onChild }) {
     }, '打卡项已删除');
   }
 
+  async function restoreActivity(activity) {
+    await run(async () => {
+      await api.restoreActivity(activity.id);
+    }, '打卡项已恢复');
+  }
+
   async function saveReward(e) {
     e.preventDefault();
     const body = {
@@ -155,6 +162,23 @@ export default function AdminApp({ onChild }) {
       await api.deleteReward(reward.id);
       if (draftReward.id === reward.id) setDraftReward(emptyReward());
     }, '奖励已删除');
+  }
+
+  async function restoreReward(reward) {
+    await run(async () => {
+      await api.restoreReward(reward.id);
+    }, '奖励已恢复');
+  }
+
+  async function logout() {
+    try {
+      await api.logout();
+    } catch {
+      // ignore
+    }
+    clearParentSession();
+    setToken('');
+    setPin('');
   }
 
   function editActivity(activity) {
@@ -212,6 +236,7 @@ export default function AdminApp({ onChild }) {
         <button type="button" className={tab === 'rewards' ? 'active' : ''} onClick={() => setTab('rewards')}><Gift />奖励</button>
         <button type="button" className={tab === 'ledger' ? 'active' : ''} onClick={() => setTab('ledger')}><History />流水</button>
         <button type="button" className="sidebar-link" onClick={onChild}><Home />孩子端</button>
+        <button type="button" className="sidebar-link danger-link" onClick={logout}><LogOut />退出登录</button>
       </aside>
       <section className="admin-main">
         <header className="admin-header">
@@ -257,7 +282,7 @@ export default function AdminApp({ onChild }) {
             </div>
             <div>
               <SectionTitle icon={<ListChecks />} title="项目列表" />
-              <ActivityTable items={safeActivities} onEdit={editActivity} onDelete={deleteActivity} />
+              <ActivityTable items={safeActivities} onEdit={editActivity} onDelete={deleteActivity} onRestore={restoreActivity} />
             </div>
           </section>
         )}
@@ -270,7 +295,7 @@ export default function AdminApp({ onChild }) {
             </div>
             <div>
               <SectionTitle icon={<Award />} title="奖励列表" />
-              <RewardTable items={safeRewards} onEdit={setDraftReward} onDelete={deleteReward} />
+              <RewardTable items={safeRewards} onEdit={setDraftReward} onDelete={deleteReward} onRestore={restoreReward} />
             </div>
           </section>
         )}

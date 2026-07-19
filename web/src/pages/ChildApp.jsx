@@ -9,13 +9,14 @@ import {
   History,
   ListChecks,
   Loader2,
+  LogOut,
   Settings,
   ShieldCheck,
   Sparkles,
   Target,
   Trophy,
 } from 'lucide-react';
-import { api, hasChildSession, setChildToken } from '../api/client';
+import { api, clearChildSession, hasChildSession, setChildToken } from '../api/client';
 import {
   CheckinList,
   EmptyState,
@@ -124,6 +125,29 @@ export default function ChildApp({ onAdmin }) {
     }
   }
 
+  async function cancelCheckin(checkin) {
+    if (!window.confirm(`取消待审核打卡「${checkin.activity_label}」？`)) return;
+    try {
+      await api.cancelCheckin(checkin.id);
+      setToast('已取消打卡');
+      await refresh();
+    } catch (error) {
+      if (error.status === 401) setVerified(false);
+      setToast(error.message);
+    }
+  }
+
+  async function logout() {
+    try {
+      await api.logout();
+    } catch {
+      // ignore network errors on logout
+    }
+    clearChildSession();
+    setVerified(false);
+    setPin('');
+  }
+
   const safeActivities = asArray(activities);
   const safeCheckins = asArray(checkins);
   const safeRewards = asArray(rewards);
@@ -175,7 +199,10 @@ export default function ChildApp({ onAdmin }) {
         <section className="child-hero">
           <div className="hero-topline">
             <span><Sparkles />积分打卡</span>
-            <button type="button" className="ghost-icon parent-entry" onClick={onAdmin} title="家长管理"><Settings size={19} /></button>
+            <div className="hero-actions">
+              <button type="button" className="ghost-icon" onClick={logout} title="退出登录"><LogOut size={18} /></button>
+              <button type="button" className="ghost-icon parent-entry" onClick={onAdmin} title="家长管理"><Settings size={19} /></button>
+            </div>
           </div>
           <div className="hero-label">当前积分</div>
           <div className="hero-balance">{summary?.balance ?? 0}</div>
@@ -269,7 +296,7 @@ export default function ChildApp({ onAdmin }) {
             <EmptyState icon={<Target />} title="这个分类还没有任务" text="换个分类看看，或请家长添加新的学习打卡项" />
           )}
           <SectionTitle icon={<History />} title="最近打卡" />
-          <CheckinList items={safeCheckins.slice(0, 8)} />
+          <CheckinList items={safeCheckins.slice(0, 8)} onCancel={cancelCheckin} />
         </section>
       )}
 

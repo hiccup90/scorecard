@@ -54,10 +54,40 @@ func (s *Server) handleAdminActivities(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAdminActivityByID(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(w, strings.TrimPrefix(r.URL.Path, "/api/v1/admin/activities/"))
+	rest := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/v1/admin/activities/"), "/")
+	parts := strings.Split(rest, "/")
+	if len(parts) == 0 || parts[0] == "" {
+		writeError(w, http.StatusNotFound, "接口不存在")
+		return
+	}
+	id, ok := parseID(w, parts[0])
 	if !ok {
 		return
 	}
+
+	// POST .../restore
+	if len(parts) == 2 && parts[1] == "restore" {
+		if r.Method != http.MethodPost {
+			methodNotAllowed(w)
+			return
+		}
+		res, err := s.db.Exec(`UPDATE activities SET enabled=1 WHERE id=?`, id)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			writeError(w, http.StatusNotFound, "打卡项不存在")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		return
+	}
+	if len(parts) != 1 {
+		writeError(w, http.StatusNotFound, "接口不存在")
+		return
+	}
+
 	switch r.Method {
 	case http.MethodPut:
 		var body Activity

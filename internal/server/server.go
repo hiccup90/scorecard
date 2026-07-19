@@ -47,10 +47,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/v1/auth/parent/login", s.handleParentLogin)
 	s.mux.HandleFunc("/api/v1/auth/child/login", s.handleChildLogin)
 	s.mux.HandleFunc("/api/v1/auth/verify", s.requireAny(s.handleVerify))
+	s.mux.HandleFunc("/api/v1/auth/logout", s.requireAny(s.handleLogout))
 
 	s.mux.HandleFunc("/api/v1/children/1/summary", s.requireAny(s.handleChildSummary))
 	s.mux.HandleFunc("/api/v1/activities", s.requireAny(s.handleActivities))
 	s.mux.HandleFunc("/api/v1/checkins", s.requireAny(s.handleCheckins))
+	s.mux.HandleFunc("/api/v1/checkins/", s.requireAny(s.handleCheckinByID))
 	s.mux.HandleFunc("/api/v1/rewards", s.requireAny(s.handleRewards))
 	s.mux.HandleFunc("/api/v1/redemptions", s.requireAny(s.handleRedemptions))
 	s.mux.HandleFunc("/api/v1/transactions", s.requireAny(s.handleTransactions))
@@ -100,8 +102,13 @@ func (s *Server) summary(userID int64) (Summary, error) {
 	if err := s.db.QueryRow(`SELECT COALESCE(SUM(change),0) FROM point_transactions WHERE user_id=?`, userID).Scan(&out.Balance); err != nil {
 		return out, err
 	}
+	// SQLite CURRENT_TIMESTAMP is UTC; convert with configured local offset for "today".
 	today := s.db.Today()
-	if err := s.db.QueryRow(`SELECT COALESCE(SUM(change),0) FROM point_transactions WHERE user_id=? AND substr(created_at,1,10)=?`, userID, today).Scan(&out.TodayTotal); err != nil {
+	if err := s.db.QueryRow(
+		`SELECT COALESCE(SUM(change),0) FROM point_transactions
+		 WHERE user_id=? AND date(created_at, ?)=?`,
+		userID, localOffsetSQL(s.cfg.Location), today,
+	).Scan(&out.TodayTotal); err != nil {
 		return out, err
 	}
 	if err := s.db.QueryRow(`SELECT COUNT(*) FROM checkins WHERE user_id=? AND status='pending'`, userID).Scan(&out.PendingCount); err != nil {
