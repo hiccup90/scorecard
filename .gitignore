@@ -27,3 +27,8 @@ android/local.properties
 .env
 .env.*
 !.env.example
+
+# Build artifacts
+dist/
+*.bak
+web/src/*.bak

@@ -1,9 +1,16 @@
-package server
+package domain
+
+type Role string
+
+const (
+	RoleChild  Role = "child"
+	RoleParent Role = "parent"
+)
 
 type User struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
-	Role string `json:"role"`
+	Role Role   `json:"role"`
 }
 
 type Activity struct {
@@ -83,7 +90,24 @@ type Summary struct {
 	MaxStreakDays int `json:"max_streak_days"`
 }
 
-type session struct {
-	UserID int64
-	Role   string
+type Session struct {
+	Token     string
+	UserID    int64
+	Role      Role
+	ExpiresAt string
 }
+
+const (
+	StatusPending   = "pending"
+	StatusApproved  = "approved"
+	StatusRejected  = "rejected"
+	StatusReversed  = "reversed"
+	StatusFulfilled = "fulfilled"
+
+	ScoreDefault  = "default"
+	ScoreQuality  = "quality"
+	ScoreDuration = "duration"
+
+	SourceNormal = "normal"
+	SourceMakeup = "makeup"
+)

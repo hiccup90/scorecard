@@ -2,10 +2,14 @@ package server
 
 import (
 	"database/sql"
-	"errors"
-	"fmt"
 	"time"
+
+	"github.com/hiccup90/scorecard/internal/domain"
 )
+
+func domainAward(mode string, base int, level string, minutes int) (int, string, string, int, error) {
+	return domain.Award(mode, base, level, minutes)
+}
 
 func scanActivities(rows *sql.Rows) ([]Activity, error) {
 	out := []Activity{}
@@ -26,45 +30,12 @@ func checkinSelect() string {
 		FROM checkins c JOIN users u ON u.id=c.user_id JOIN activities a ON a.id=c.activity_id`
 }
 
-func scanCheckins(rows *sql.Rows) ([]Checkin, error) {
-	out := []Checkin{}
-	for rows.Next() {
-		var c Checkin
-		var level, reviewedAt, note, reverseReason sql.NullString
-		var minutes sql.NullInt64
-		var counts int
-		if err := rows.Scan(&c.ID, &c.UserID, &c.UserName, &c.ActivityID, &c.ActivityLabel, &c.ActivityIcon, &c.ActivityColor, &c.Category, &c.ActivityDate, &c.SubmittedAt, &c.Status, &c.Source, &c.BasePoints, &c.ScoreMode, &level, &minutes, &c.AwardedPoints, &c.StreakBonus, &counts, &note, &reviewedAt, &reverseReason); err != nil {
-			return nil, err
-		}
-		if level.Valid {
-			c.ReviewLevel = &level.String
-		}
-		if minutes.Valid {
-			v := int(minutes.Int64)
-			c.ReviewMinutes = &v
-		}
-		c.CountsForStreak = counts == 1
-		if note.Valid {
-			c.ReviewNote = note.String
-		}
-		if reviewedAt.Valid {
-			c.ReviewedAt = &reviewedAt.String
-		}
-		if reverseReason.Valid {
-			c.ReverseReason = reverseReason.String
-		}
-		out = append(out, c)
-	}
-	return out, rows.Err()
-}
-
-func checkinForUpdate(tx *sql.Tx, id int64) (Checkin, error) {
-	row := tx.QueryRow(checkinSelect()+` WHERE c.id=?`, id)
+func scanCheckinRow(scan func(dest ...interface{}) error) (Checkin, error) {
 	var c Checkin
 	var level, reviewedAt, note, reverseReason sql.NullString
 	var minutes sql.NullInt64
 	var counts int
-	if err := row.Scan(&c.ID, &c.UserID, &c.UserName, &c.ActivityID, &c.ActivityLabel, &c.ActivityIcon, &c.ActivityColor, &c.Category, &c.ActivityDate, &c.SubmittedAt, &c.Status, &c.Source, &c.BasePoints, &c.ScoreMode, &level, &minutes, &c.AwardedPoints, &c.StreakBonus, &counts, &note, &reviewedAt, &reverseReason); err != nil {
+	if err := scan(&c.ID, &c.UserID, &c.UserName, &c.ActivityID, &c.ActivityLabel, &c.ActivityIcon, &c.ActivityColor, &c.Category, &c.ActivityDate, &c.SubmittedAt, &c.Status, &c.Source, &c.BasePoints, &c.ScoreMode, &level, &minutes, &c.AwardedPoints, &c.StreakBonus, &counts, &note, &reviewedAt, &reverseReason); err != nil {
 		return c, err
 	}
 	if level.Valid {
@@ -87,30 +58,34 @@ func checkinForUpdate(tx *sql.Tx, id int64) (Checkin, error) {
 	return c, nil
 }
 
-func award(mode string, base int, level string, minutes int) (int, string, string, int, error) {
-	switch mode {
-	case "quality":
-		if level == "" {
-			level = "pass"
+func scanCheckins(rows *sql.Rows) ([]Checkin, error) {
+	out := []Checkin{}
+	for rows.Next() {
+		c, err := scanCheckinRow(rows.Scan)
+		if err != nil {
+			return nil, err
 		}
-		multipliers := map[string]int{"pass": 1, "good": 2, "excellent": 3}
-		labels := map[string]string{"pass": "及格", "good": "良好", "excellent": "优秀"}
-		m, ok := multipliers[level]
-		if !ok {
-			return 0, "", "", 0, errors.New("无效的质量档位")
-		}
-		return base * m, labels[level], level, 0, nil
-	case "duration":
-		if minutes < 10 {
-			return 0, "", "", 0, errors.New("时长至少 10 分钟")
-		}
-		units := minutes / 10
-		return base * units, fmt.Sprintf("%d分钟（%d个单位）", minutes, units), "", minutes, nil
-	default:
-		return base, "默认分", "", 0, nil
+		out = append(out, c)
 	}
+	return out, rows.Err()
 }
 
+func checkinForUpdate(tx *sql.Tx, id int64) (Checkin, error) {
+	row := tx.QueryRow(checkinSelect()+` WHERE c.id=?`, id)
+	return scanCheckinRow(row.Scan)
+}
+
+func award(mode string, base int, level string, minutes int) (int, string, string, int, error) {
+	pts, suffix, lvl, mins, err := domainAward(mode, base, level, minutes)
+	if err != nil {
+		// map domain messages for API compatibility
+		return 0, "", "", 0, err
+	}
+	return pts, suffix, lvl, mins, nil
+}
+
+// recalcStreakTx recalculates streak after the current checkin is already approved in the same tx.
+// bonus = min(max(streakDays-1, 0), 6)
 func recalcStreakTx(tx *sql.Tx, userID, activityID int64) (int, error) {
 	rows, err := tx.Query(`SELECT DISTINCT activity_date FROM checkins WHERE user_id=? AND activity_id=? AND status='approved' AND counts_for_streak=1 ORDER BY activity_date DESC`, userID, activityID)
 	if err != nil {
@@ -153,7 +128,7 @@ func recalcStreakTx(tx *sql.Tx, userID, activityID int64) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return min(max(streak-1, 0), 6), nil
+	return domain.StreakBonus(streak), nil
 }
 
 func balanceTx(tx *sql.Tx, userID int64) (int, error) {
@@ -194,15 +169,11 @@ func scanRedemptions(rows *sql.Rows) ([]Redemption, error) {
 	return out, rows.Err()
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
+func audit(tx *sql.Tx, actor int64, action, entityType string, entityID int64, detail string) error {
+	_, err := tx.Exec(`INSERT INTO audit_events (actor_user_id, action, entity_type, entity_id, detail) VALUES (?,?,?,?,?)`, actor, action, entityType, entityID, detail)
+	return err
 }
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
+
+func auditDB(db *sql.DB, actor int64, action, entityType string, entityID int64, detail string) {
+	_, _ = db.Exec(`INSERT INTO audit_events (actor_user_id, action, entity_type, entity_id, detail) VALUES (?,?,?,?,?)`, actor, action, entityType, entityID, detail)
 }

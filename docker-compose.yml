@@ -1,15 +1,28 @@
 services:
   api:
     image: ghcr.io/hiccup90/scorecard:latest
-    build: .
+    build:
+      context: .
+      args:
+        VERSION: ${APP_VERSION:-dev}
     ports:
       - "3003:3003"
     volumes:
       - ./data:/app/data
     environment:
-      - PORT=3003
-      - ADMIN_PIN=${ADMIN_PIN:-1234}
-      - CHILD_PIN=${CHILD_PIN:-${ADMIN_PIN:-1234}}
-      - DB_PATH=/app/data/scorecard.db
-      - STATIC_DIR=/app/web/dist
+      PORT: "3003"
+      ADMIN_PIN: ${ADMIN_PIN:?set ADMIN_PIN}
+      CHILD_PIN: ${CHILD_PIN:-}
+      DB_PATH: /app/data/scorecard.db
+      STATIC_DIR: /app/web/dist
+      TZ: ${TZ:-Asia/Shanghai}
+      MAKEUP_DAYS: ${MAKEUP_DAYS:-30}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      APP_VERSION: ${APP_VERSION:-dev}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3003/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
