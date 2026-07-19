@@ -149,7 +149,17 @@ export default function AdminApp({ onChild }) {
   }
 
   if (!token) {
-    return <Login title="家长验证" icon={<Lock />} pin={pin} setPin={setPin} err={err} onSubmit={login} />;
+    return (
+      <Login
+        title="家长验证"
+        icon={<Lock />}
+        pin={pin}
+        setPin={setPin}
+        err={err}
+        onSubmit={login}
+        hint="输入家长 ADMIN_PIN。"
+      />
+    );
   }
 
   const safeCheckins = asArray(checkins);

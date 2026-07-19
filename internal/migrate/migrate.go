@@ -29,7 +29,6 @@ func Up(db *sql.DB) error {
 	)`); err != nil {
 		return err
 	}
-	// Upgrade older schema_migrations (version-only) if needed.
 	if err := ensureMigrationColumns(db); err != nil {
 		return err
 	}
@@ -61,28 +60,39 @@ func Up(db *sql.DB) error {
 		if n > 0 {
 			continue
 		}
-		// If core tables already exist from pre-versioned bootstrap, mark v1 applied without re-exec.
-		if version == 1 {
-			var tables int
-			_ = db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='users'`).Scan(&tables)
-			if tables > 0 {
-				if _, err := db.Exec(`INSERT INTO schema_migrations (version, name) VALUES (?,?)`, version, path.Base(name)); err != nil {
-					return err
-				}
-				continue
-			}
-		}
+		// Legacy DBs already have core tables: still run IF NOT EXISTS SQL so new
+		// tables (e.g. sessions) are created, then mark version applied.
 		body, err := sqlFS.ReadFile(name)
 		if err != nil {
 			return err
+		}
+		// Skip pure no-op seed placeholder without failing.
+		sqlText := strings.TrimSpace(string(body))
+		if sqlText == "" || sqlText == "SELECT 1;" {
+			if _, err := db.Exec(`INSERT INTO schema_migrations (version, name) VALUES (?,?)`, version, path.Base(name)); err != nil {
+				return err
+			}
+			continue
 		}
 		tx, err := db.Begin()
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(string(body)); err != nil {
+		if _, err := tx.Exec(sqlText); err != nil {
 			_ = tx.Rollback()
-			return fmt.Errorf("migrate %s: %w", name, err)
+			// If objects already exist with incompatible definitions, try to continue
+			// only after ensuring critical new tables exist.
+			if !isBenignExistsErr(err) {
+				_ = ensureSessionsTable(db)
+				// re-check: if sessions now exists, mark applied for legacy upgrade path
+				if hasTable(db, "sessions") && version == 1 {
+					if _, err2 := db.Exec(`INSERT OR IGNORE INTO schema_migrations (version, name) VALUES (?,?)`, version, path.Base(name)); err2 != nil {
+						return fmt.Errorf("migrate %s: %w (also ensure sessions: ok)", name, err)
+					}
+					continue
+				}
+				return fmt.Errorf("migrate %s: %w", name, err)
+			}
 		}
 		if _, err := tx.Exec(`INSERT INTO schema_migrations (version, name) VALUES (?,?)`, version, path.Base(name)); err != nil {
 			_ = tx.Rollback()
@@ -92,7 +102,54 @@ func Up(db *sql.DB) error {
 			return err
 		}
 	}
+
+	// Always ensure critical tables for DBs upgraded from pre-auth versions.
+	if err := ensureSessionsTable(db); err != nil {
+		return err
+	}
 	return nil
+}
+
+func ensureSessionsTable(db *sql.DB) error {
+	stmts := []string{
+		`CREATE TABLE IF NOT EXISTS sessions (
+			token TEXT PRIMARY KEY,
+			user_id INTEGER NOT NULL,
+			role TEXT NOT NULL CHECK (role IN ('child','parent')),
+			expires_at TEXT NOT NULL,
+			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)`,
+		`CREATE TABLE IF NOT EXISTS audit_events (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			actor_user_id INTEGER,
+			action TEXT NOT NULL,
+			entity_type TEXT NOT NULL,
+			entity_id INTEGER,
+			detail TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+	}
+	for _, s := range stmts {
+		if _, err := db.Exec(s); err != nil {
+			return fmt.Errorf("ensure schema: %w", err)
+		}
+	}
+	return nil
+}
+
+func hasTable(db *sql.DB, name string) bool {
+	var n int
+	_ = db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?`, name).Scan(&n)
+	return n > 0
+}
+
+func isBenignExistsErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "already exists")
 }
 
 func ensureMigrationColumns(db *sql.DB) error {

@@ -30,13 +30,13 @@ export function Modal({ title, children, onClose }) {
   );
 }
 
-export function Login({ title, icon, pin, setPin, err, onSubmit }) {
+export function Login({ title, icon, pin, setPin, err, onSubmit, hint }) {
   return (
     <main className="login-page">
       <form className="login-card" onSubmit={onSubmit}>
         <div className="login-brand"><span className="login-icon">{icon}</span><span>Scorecard</span></div>
         <h1>{title}</h1>
-        <p>输入 PIN 后继续使用积分打卡。</p>
+        <p>{hint || '输入 PIN 后继续使用积分打卡。'}</p>
         <div className="pin-shell">
           <Lock size={17} />
           <input autoFocus type="password" inputMode="numeric" autoComplete="one-time-code" value={pin} onChange={(e) => setPin(e.target.value)} placeholder="PIN" />

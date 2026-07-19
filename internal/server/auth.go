@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -53,13 +54,15 @@ func (s *Server) handleParentLogin(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &body) {
 		return
 	}
-	if body.PIN != s.cfg.AdminPIN {
+	pin := strings.TrimSpace(body.PIN)
+	if pin == "" || pin != s.cfg.AdminPIN {
 		writeError(w, http.StatusForbidden, "PIN 码错误")
 		return
 	}
 	token, err := s.createSession(2, "parent")
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "生成 token 失败")
+		s.log.Error("create parent session", "err", err)
+		writeError(w, http.StatusInternalServerError, "登录失败：无法创建会话，请检查数据库 sessions 表")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "token": token, "role": "parent", "user_id": 2})
@@ -81,13 +84,16 @@ func (s *Server) handleChildLogin(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &body) {
 		return
 	}
-	if body.PIN != s.cfg.ChildPIN {
+	pin := strings.TrimSpace(body.PIN)
+	// Child PIN defaults to ADMIN_PIN when CHILD_PIN unset; accept either for convenience.
+	if pin == "" || (pin != s.cfg.ChildPIN && pin != s.cfg.AdminPIN) {
 		writeError(w, http.StatusForbidden, "PIN 码错误")
 		return
 	}
 	token, err := s.createSession(1, "child")
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "生成 token 失败")
+		s.log.Error("create child session", "err", err)
+		writeError(w, http.StatusInternalServerError, "登录失败：无法创建会话，请检查数据库 sessions 表")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "token": token, "role": "child", "user_id": 1})

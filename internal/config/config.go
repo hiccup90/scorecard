@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -25,7 +26,7 @@ type Config struct {
 
 func Load() (Config, error) {
 	port := env("PORT", "3003")
-	adminPIN := env("ADMIN_PIN", "")
+	adminPIN := strings.TrimSpace(env("ADMIN_PIN", ""))
 	allowDefault := env("ALLOW_DEFAULT_PIN", "") == "1" || env("SCORECARD_DEV", "") == "1"
 	if adminPIN == "" {
 		if allowDefault {
@@ -49,7 +50,10 @@ func Load() (Config, error) {
 		makeupDays = 0
 	}
 
-	childPIN := env("CHILD_PIN", adminPIN)
+	childPIN := strings.TrimSpace(env("CHILD_PIN", adminPIN))
+	if childPIN == "" {
+		childPIN = adminPIN
+	}
 	return Config{
 		Addr:            ":" + port,
 		DBPath:          env("DB_PATH", filepath.Join("data", "scorecard.db")),

@@ -155,7 +155,17 @@ export default function ChildApp({ onAdmin }) {
   const spentTotal = Math.abs(safeTransactions.filter((t) => t.change < 0).reduce((sum, t) => sum + t.change, 0));
 
   if (!verified) {
-    return <Login title="欢迎打卡" icon={<ShieldCheck />} pin={pin} setPin={setPin} err={err} onSubmit={login} />;
+    return (
+      <Login
+        title="欢迎打卡"
+        icon={<ShieldCheck />}
+        pin={pin}
+        setPin={setPin}
+        err={err}
+        onSubmit={login}
+        hint="输入孩子端 PIN（默认与 ADMIN_PIN 相同；未单独设置 CHILD_PIN 时）。"
+      />
+    );
   }
 
   return (
