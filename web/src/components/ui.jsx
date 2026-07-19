@@ -297,12 +297,21 @@ export function ReasonModal({ title, action, defaultReason, onClose, onSubmit })
 function IconPicker({ value, onChange }) {
   const icons = ['book', 'read', 'pen', 'math', 'note', 'voice', 'letters', 'run', 'bag', 'home', 'music', 'star'];
   return (
-    <div className="icon-picker">
-      {icons.map((ic) => (
-        <button key={ic} type="button" className={value === ic ? 'active' : ''} onClick={() => onChange(ic)} title={ic}>
-          {iconNode(ic)}
-        </button>
-      ))}
+    <div className="icon-picker-wrap">
+      <div className="icon-preview" aria-live="polite">
+        <span className="icon-preview-mark">{iconNode(value || 'star')}</span>
+        <div>
+          <strong>当前图标</strong>
+          <small>{value || 'star'}</small>
+        </div>
+      </div>
+      <div className="icon-picker">
+        {icons.map((ic) => (
+          <button key={ic} type="button" className={value === ic ? 'active' : ''} onClick={() => onChange(ic)} title={ic}>
+            {iconNode(ic)}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -311,9 +320,12 @@ export function ActivityForm({ draft, setDraft, onSubmit }) {
   return (
     <form className="config-panel" onSubmit={onSubmit}>
       <div className="panel-head">
-        <div>
-          <strong>{draft.id ? '编辑打卡项' : '新增打卡项'}</strong>
-          <small>设置积分规则、分类和展示图标</small>
+        <div className="panel-head-main">
+          <span className="panel-head-icon">{iconNode(draft.icon || 'star')}</span>
+          <div>
+            <strong>{draft.id ? '编辑打卡项' : '新增打卡项'}</strong>
+            <small>设置积分规则、分类和展示图标</small>
+          </div>
         </div>
         {draft.id && <EnabledBadge enabled={draft.enabled} />}
       </div>
@@ -333,7 +345,10 @@ export function ActivityForm({ draft, setDraft, onSubmit }) {
         <div className="field"><label>分类</label><input value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })} /></div>
         <div className="field"><label>排序</label><input type="number" value={draft.sort_order} onChange={(e) => setDraft({ ...draft, sort_order: e.target.value })} /></div>
       </div>
-      <div className="field"><label>图标</label><IconPicker value={draft.icon} onChange={(icon) => setDraft({ ...draft, icon })} /></div>
+      <div className="field">
+        <label>图标</label>
+        <IconPicker value={draft.icon} onChange={(icon) => setDraft({ ...draft, icon })} />
+      </div>
       {draft.id && (
         <label className="checkbox-line">
           <input type="checkbox" checked={draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} />
@@ -348,7 +363,7 @@ export function ActivityForm({ draft, setDraft, onSubmit }) {
   );
 }
 
-export function ActivityTable({ items, onEdit }) {
+export function ActivityTable({ items, onEdit, onDelete }) {
   const list = asArray(items);
   if (!list.length) return <EmptyState icon={<BookOpen />} title="暂无打卡项" text="先添加几个每天要完成的小任务" />;
   return (
@@ -363,7 +378,12 @@ export function ActivityTable({ items, onEdit }) {
             </div>
             <small>{a.category} · {scoreText(a)} · 排序 {a.sort_order}</small>
           </div>
-          <button type="button" className="secondary" onClick={() => onEdit(a)}><PenLine size={16} />编辑</button>
+          <div className="row-actions">
+            <button type="button" className="secondary" onClick={() => onEdit(a)}><PenLine size={16} />编辑</button>
+            {a.enabled && onDelete && (
+              <button type="button" className="danger" onClick={() => onDelete(a)}><X size={16} />删除</button>
+            )}
+          </div>
         </div>
       ))}
     </div>
@@ -404,7 +424,7 @@ export function RewardForm({ draft, setDraft, onSubmit }) {
   );
 }
 
-export function RewardTable({ items, onEdit }) {
+export function RewardTable({ items, onEdit, onDelete }) {
   const list = asArray(items);
   if (!list.length) return <EmptyState icon={<Gift />} title="暂无奖励" text="添加奖励后，孩子端会出现兑换货架" />;
   return (
@@ -419,7 +439,12 @@ export function RewardTable({ items, onEdit }) {
             </div>
             <small>{r.cost} 分 · {r.auto_approve ? '自动通过' : '需审批'} · 库存 {r.stock < 0 ? '无限' : r.stock}</small>
           </div>
-          <button type="button" className="secondary" onClick={() => onEdit(r)}><PenLine size={16} />编辑</button>
+          <div className="row-actions">
+            <button type="button" className="secondary" onClick={() => onEdit(r)}><PenLine size={16} />编辑</button>
+            {r.enabled && onDelete && (
+              <button type="button" className="danger" onClick={() => onDelete(r)}><X size={16} />删除</button>
+            )}
+          </div>
         </div>
       ))}
     </div>

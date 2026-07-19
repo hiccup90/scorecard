@@ -118,12 +118,21 @@ export default function AdminApp({ onChild }) {
       ...draftActivity,
       base_points: Number(draftActivity.base_points),
       sort_order: Number(draftActivity.sort_order),
+      icon: draftActivity.icon || 'star',
       enabled: draftActivity.id ? Boolean(draftActivity.enabled) : true,
     };
     await run(async () => {
       await api.saveActivity(body);
       setDraftActivity(emptyActivity());
     }, '打卡项已保存');
+  }
+
+  async function deleteActivity(activity) {
+    if (!window.confirm(`确定删除打卡项「${activity.label}」吗？\n删除后孩子端将不再显示（软删除）。`)) return;
+    await run(async () => {
+      await api.deleteActivity(activity.id);
+      if (draftActivity.id === activity.id) setDraftActivity(emptyActivity());
+    }, '打卡项已删除');
   }
 
   async function saveReward(e) {
@@ -138,6 +147,28 @@ export default function AdminApp({ onChild }) {
       await api.saveReward(body);
       setDraftReward(emptyReward());
     }, '奖励已保存');
+  }
+
+  async function deleteReward(reward) {
+    if (!window.confirm(`确定删除奖励「${reward.name}」吗？`)) return;
+    await run(async () => {
+      await api.deleteReward(reward.id);
+      if (draftReward.id === reward.id) setDraftReward(emptyReward());
+    }, '奖励已删除');
+  }
+
+  function editActivity(activity) {
+    setDraftActivity({
+      id: activity.id,
+      label: activity.label || '',
+      base_points: activity.base_points ?? 1,
+      score_mode: activity.score_mode || 'default',
+      icon: activity.icon || 'star',
+      color: activity.color || '#3B82F6',
+      category: activity.category || '生活',
+      sort_order: activity.sort_order ?? 0,
+      enabled: Boolean(activity.enabled),
+    });
   }
 
   async function doAdjust(e) {
@@ -226,7 +257,7 @@ export default function AdminApp({ onChild }) {
             </div>
             <div>
               <SectionTitle icon={<ListChecks />} title="项目列表" />
-              <ActivityTable items={safeActivities} onEdit={setDraftActivity} />
+              <ActivityTable items={safeActivities} onEdit={editActivity} onDelete={deleteActivity} />
             </div>
           </section>
         )}
@@ -239,7 +270,7 @@ export default function AdminApp({ onChild }) {
             </div>
             <div>
               <SectionTitle icon={<Award />} title="奖励列表" />
-              <RewardTable items={safeRewards} onEdit={setDraftReward} />
+              <RewardTable items={safeRewards} onEdit={setDraftReward} onDelete={deleteReward} />
             </div>
           </section>
         )}

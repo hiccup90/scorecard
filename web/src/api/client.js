@@ -108,11 +108,13 @@ export const api = {
     body,
     prefer: 'parent',
   }),
+  deleteActivity: (id) => request(`/admin/activities/${id}`, { method: 'DELETE', prefer: 'parent' }),
   saveReward: (body) => request(body.id ? `/admin/rewards/${body.id}` : '/admin/rewards', {
     method: body.id ? 'PUT' : 'POST',
     body,
     prefer: 'parent',
   }),
+  deleteReward: (id) => request(`/admin/rewards/${id}`, { method: 'DELETE', prefer: 'parent' }),
   adjust: (body) => request('/admin/adjustments', { method: 'POST', body, prefer: 'parent' }),
   approveRedemption: (id, body = {}) => request(`/admin/redemptions/${id}/approve`, { method: 'POST', body, prefer: 'parent' }),
   rejectRedemption: (id, body = {}) => request(`/admin/redemptions/${id}/reject`, { method: 'POST', body, prefer: 'parent' }),
